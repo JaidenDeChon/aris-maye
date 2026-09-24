@@ -688,10 +688,7 @@
                                     alt=""
                                     class="h-7 w-7 drop-shadow shrink-0"
                                 />
-                                <div>
-                                    <h3 class="text-lg font-semibold leading-tight">Grand Exchange</h3>
-                                    <p class="text-xs text-muted-foreground">Latest prices from real trades</p>
-                                </div>
+                                <h3 class="text-lg font-semibold leading-tight">Grand Exchange</h3>
                             </div>
                             {#if collapseGrandExchangeCard}
                                 <Button
@@ -709,7 +706,6 @@
                                     label="Buy price"
                                     value={missingPriceReason ?? formatPrice(gameItem?.highPrice)}
                                     tone={missingPriceReason ? 'muted' : 'neutral'}
-                                    hint="Last paid by someone buying instantly"
                                 >
                                     {#snippet icon()}<TrendingUp class="h-4 w-4" />{/snippet}
                                 </StatTile>
@@ -717,7 +713,6 @@
                                     label="Sell price"
                                     value={missingPriceReason ?? formatPrice(gameItem?.lowPrice)}
                                     tone={missingPriceReason ? 'muted' : 'neutral'}
-                                    hint="Last got by someone selling instantly"
                                 >
                                     {#snippet icon()}<TrendingDown class="h-4 w-4" />{/snippet}
                                 </StatTile>

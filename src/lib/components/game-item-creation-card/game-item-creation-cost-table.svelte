@@ -102,10 +102,6 @@
         return sum;
     });
 
-    // Rows the walk broke down into their own ingredients. Both the item and its ingredients are
-    // listed and priced, so the reader has to be told to tick one side or the other.
-    const hasMakeableRows = $derived(costRows.some((row) => row.substituted));
-
     $effect(() => {
         onTotalChange?.(costRows.length ? selectedTotal : null);
     });
@@ -228,23 +224,11 @@
 <section class="flex flex-col gap-2">
     <div>
         <h4 class="text-sm font-semibold">Ingredients and cost</h4>
-        <p class="text-xs text-muted-foreground">
-            Everything the recipe uses up, down to the raw materials, at Grand Exchange buy prices. Tick what you
-            already have and it comes off the cost.
-        </p>
     </div>
 
     {#if !costRows.length}
         <p class="text-sm text-muted-foreground">No cost data available.</p>
     {:else}
-        {#if hasMakeableRows}
-            <p class="text-xs text-muted-foreground">
-                Items marked <span class="font-medium text-foreground">Can be made</span> are also broken down into their
-                own ingredients further down the list. If you're buying the item, tick its ingredients. If you're making it,
-                tick the item.
-            </p>
-        {/if}
-
         <div class="border rounded-md overflow-hidden">
             <Table.Root>
                 <Table.Header>

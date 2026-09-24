@@ -196,7 +196,7 @@
     <div>
         <h4 class="text-sm font-semibold">Skills and XP</h4>
         <p class="text-xs text-muted-foreground">
-            For making it from scratch, counting any ingredients you make along the way.
+            For making it from scratch, including any ingredients you make along the way.
         </p>
     </div>
     {#if !rows.length}

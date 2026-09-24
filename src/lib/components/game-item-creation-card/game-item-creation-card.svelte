@@ -55,15 +55,10 @@
     {:else}
         <!-- Header -->
         <Card.Header>
-            <Card.Title class="text-xl">How to make it</Card.Title>
-            <Card.Description>
-                {hasIngredients
-                    ? 'What goes into this item, the XP you get for making it, and whether it pays.'
-                    : 'This item has no ingredients.'}
-                {#if refreshing}
-                    <span class="text-muted-foreground/80">· Updating…</span>
-                {/if}
-            </Card.Description>
+            <Card.Title class="text-xl">Recipe tree</Card.Title>
+            {#if refreshing}
+                <Card.Description>Updating…</Card.Description>
+            {/if}
         </Card.Header>
 
         <!-- Body -->
@@ -86,18 +81,9 @@
                 {#each specOptions as option (option.id)}
                     <Tabs.Content value={option.id} class="px-5 pb-1">
                         <div class="flex flex-col gap-6 pt-2">
-                            <section class="flex flex-col gap-2">
-                                <div>
-                                    <h4 class="text-sm font-semibold">Recipe tree</h4>
-                                    <p class="text-xs text-muted-foreground">
-                                        Each item branches out into the ingredients it's made from. Click one to open
-                                        its page.
-                                    </p>
-                                </div>
-                                <div class="border rounded-md bg-muted/40 p-3">
-                                    <GameItemTree {gameItem} creationSpec={option.spec} />
-                                </div>
-                            </section>
+                            <div class="border rounded-md bg-muted/40 p-3">
+                                <GameItemTree {gameItem} creationSpec={option.spec} />
+                            </div>
                             <div class="grid gap-6 lg:grid-cols-[3fr_2fr] lg:items-start">
                                 <GameItemCreationCostTable
                                     {gameItem}

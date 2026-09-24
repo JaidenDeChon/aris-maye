@@ -19,35 +19,29 @@
         {
             label: 'Sell on the GE',
             value: geValue,
-            hint: geValue === null ? 'No GE price to sell at' : `At its GE price of ${formatGp(geValue)}`,
             icon: '/other-images/grand-exchange.png',
         },
         {
             label: 'Base value',
             value: storeValue,
-            hint: storeValue === null ? 'No base value' : `At its base value of ${formatGp(storeValue)}`,
             icon: '/other-images/pot.png',
         },
         {
             label: 'High alch',
             value: highAlchValue,
-            hint: highAlchValue === null ? "Can't be alched" : `At ${formatGp(highAlchValue)}, before the nature rune`,
+            hint: highAlchValue === null ? undefined : 'Not including nature runes',
             icon: '/spell-images/high-level-alchemy.png',
         },
         {
             label: 'Low alch',
             value: lowAlchValue,
-            hint: lowAlchValue === null ? "Can't be alched" : `At ${formatGp(lowAlchValue)}, before the nature rune`,
+            hint: lowAlchValue === null ? undefined : 'Not including nature runes',
             icon: '/spell-images/low-level-alchemy.png',
         },
     ]);
 
     function normalizeNumber(value: number | null | undefined): number | null {
         return typeof value === 'number' ? value : null;
-    }
-
-    function formatGp(value: number) {
-        return `${Math.round(value).toLocaleString()} gp`;
     }
 
     function formatDelta(value: number | null, baseline: number | null): string {
