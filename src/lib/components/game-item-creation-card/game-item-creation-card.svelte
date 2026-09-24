@@ -66,7 +66,7 @@
             <Tabs.Root value={selectedSpecId} onValueChange={(val) => (selectedSpecId = val)}>
                 <!-- A tab strip with one tab in it is a control with nothing to choose. -->
                 {#if specOptions.length > 1}
-                    <div class="px-5 mt-2 flex flex-wrap items-center gap-3">
+                    <div class="px-3 sm:px-5 mt-2 flex flex-wrap items-center gap-3">
                         <Tabs.List class="flex gap-2 flex-wrap w-fit">
                             {#each specOptions as option (option.id)}
                                 <Tabs.Trigger value={option.id}>{option.label}</Tabs.Trigger>
@@ -79,12 +79,14 @@
                 {/if}
 
                 {#each specOptions as option (option.id)}
-                    <Tabs.Content value={option.id} class="px-5 pb-1">
+                    <Tabs.Content value={option.id} class="px-3 sm:px-5 pb-1">
                         <div class="flex flex-col gap-6 pt-2">
                             <div class="border rounded-md bg-muted/40 p-3">
                                 <GameItemTree {gameItem} creationSpec={option.spec} />
                             </div>
-                            <div class="grid gap-6 lg:grid-cols-[3fr_2fr] lg:items-start">
+                            <div
+                                class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start"
+                            >
                                 <GameItemCreationCostTable
                                     {gameItem}
                                     creationSpec={option.spec}

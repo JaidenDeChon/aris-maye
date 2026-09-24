@@ -670,7 +670,7 @@
 
         <!-- Prices. Each number carries a line saying what it is, because "high" and "low" on
              their own do not say which side of a trade they come from. -->
-        <div class="grid gap-4 lg:grid-cols-2 mt-6">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 mt-6">
             {#if pending}
                 <Skeleton class="h-56 w-full" />
                 <Skeleton class="h-56 w-full" />

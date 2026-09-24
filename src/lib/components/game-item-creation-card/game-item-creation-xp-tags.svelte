@@ -202,7 +202,7 @@
     {#if !rows.length}
         <p class="text-sm text-muted-foreground">No experience data available.</p>
     {:else}
-        <ul class="grid gap-2">
+        <ul class="grid grid-cols-1 gap-2">
             {#each rows as row (row.skillName)}
                 <li class="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                     {#if skillIcon(row.skillName)}

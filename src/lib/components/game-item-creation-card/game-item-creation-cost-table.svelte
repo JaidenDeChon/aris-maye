@@ -230,10 +230,10 @@
         <p class="text-sm text-muted-foreground">No cost data available.</p>
     {:else}
         <div class="border rounded-md overflow-hidden">
-            <Table.Root>
+            <Table.Root class="text-xs sm:text-sm">
                 <Table.Header>
                     <Table.Row>
-                        <Table.Head class="w-20">
+                        <Table.Head class="px-2 sm:px-4 w-10 sm:w-20">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -241,20 +241,20 @@
                                     checked={allChecked}
                                     onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
                                 />
-                                <span class="text-xs">Have</span>
+                                <span class="text-xs sr-only sm:not-sr-only">Have</span>
                             </label>
                         </Table.Head>
-                        <Table.Head>Item</Table.Head>
-                        <Table.Head class="text-end">Qty</Table.Head>
-                        <Table.Head class="text-end">Each</Table.Head>
-                        <Table.Head class="text-end">Cost</Table.Head>
+                        <Table.Head class="px-2 sm:px-4">Item</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end">Qty</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end hidden sm:table-cell">Each</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end">Cost</Table.Head>
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
                     {#each costRows as row (row.key)}
                         {@const owned = ownedMap[row.key]}
                         <Table.Row class={owned ? 'bg-muted/40' : ''}>
-                            <Table.Cell class="w-20">
+                            <Table.Cell class="px-2 sm:px-4 w-10 sm:w-20">
                                 <input
                                     type="checkbox"
                                     aria-label={`I already have ${rowLabel(row)}`}
@@ -262,7 +262,7 @@
                                     onchange={() => toggleRow(row.key)}
                                 />
                             </Table.Cell>
-                            <Table.Cell class="font-medium">
+                            <Table.Cell class="px-2 sm:px-4 font-medium">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                     {#if row.item.id}
                                         <a
@@ -284,17 +284,19 @@
                                     {/if}
                                 </div>
                             </Table.Cell>
-                            <Table.Cell class="text-end tabular-nums whitespace-nowrap"
+                            <Table.Cell class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap"
                                 >{formatNumber(row.amount)}</Table.Cell
                             >
-                            <Table.Cell class="text-end tabular-nums whitespace-nowrap">
+                            <Table.Cell
+                                class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap hidden sm:table-cell"
+                            >
                                 {#if row.unitPrice === null}
                                     <span class="text-muted-foreground">No price</span>
                                 {:else}
                                     {formatGp(row.unitPrice)}
                                 {/if}
                             </Table.Cell>
-                            <Table.Cell class="text-end tabular-nums whitespace-nowrap">
+                            <Table.Cell class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap">
                                 {#if owned}
                                     <span class="text-muted-foreground">Have it</span>
                                 {:else if row.totalPrice === null}
@@ -302,14 +304,21 @@
                                 {:else}
                                     {formatGp(row.totalPrice)}
                                 {/if}
+                                <!-- Phones have no room for the "Each" column, so the unit price rides
+                                     under the cost instead. -->
+                                <span class="block whitespace-normal text-xs text-muted-foreground sm:hidden">
+                                    {row.unitPrice === null ? 'No price' : `${formatGp(row.unitPrice)} each`}
+                                </span>
                             </Table.Cell>
                         </Table.Row>
                     {/each}
                 </Table.Body>
                 <Table.Footer>
                     <Table.Row>
-                        <Table.Cell colspan={4} class="font-semibold">Total cost</Table.Cell>
-                        <Table.Cell class="text-end font-semibold tabular-nums whitespace-nowrap">
+                        <Table.Cell colspan={2} class="px-2 sm:px-4 font-semibold">Total cost</Table.Cell>
+                        <Table.Cell class="hidden sm:table-cell"></Table.Cell>
+                        <Table.Cell></Table.Cell>
+                        <Table.Cell class="px-2 sm:px-4 text-end font-semibold tabular-nums whitespace-nowrap">
                             {selectedTotal === null ? 'Unknown' : formatGp(selectedTotal)}
                         </Table.Cell>
                     </Table.Row>

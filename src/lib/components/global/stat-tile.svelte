@@ -35,9 +35,9 @@
                 {@render icon()}
             </span>
         {/if}
-        <span class="truncate">{label}</span>
+        <span>{label}</span>
     </div>
-    <p class="text-xl font-semibold tabular-nums {toneClass}">{value}</p>
+    <p class="text-base sm:text-xl font-semibold tabular-nums {toneClass}">{value}</p>
     {#if hint}
         <p class="text-xs text-muted-foreground">{hint}</p>
     {/if}
