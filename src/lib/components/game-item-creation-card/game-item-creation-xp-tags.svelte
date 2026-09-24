@@ -106,6 +106,38 @@
         return map;
     }
 
+    // Skills with an icon in `static/skill-images`. Anything else just goes without one.
+    const SKILLS_WITH_ICONS = new Set([
+        'agility',
+        'attack',
+        'construction',
+        'cooking',
+        'crafting',
+        'defence',
+        'farming',
+        'firemaking',
+        'fishing',
+        'fletching',
+        'herblore',
+        'hitpoints',
+        'hunter',
+        'magic',
+        'mining',
+        'prayer',
+        'ranged',
+        'runecrafting',
+        'slayer',
+        'smithing',
+        'strength',
+        'thieving',
+        'woodcutting',
+    ]);
+
+    function skillIcon(name: string): string | null {
+        const key = normalizeSkillName(name);
+        return key && SKILLS_WITH_ICONS.has(key) ? `/skill-images/${key}.png` : null;
+    }
+
     function normalizeSkillName(name: string | null | undefined): string | null {
         if (!name) return null;
         const trimmed = name.trim().toLowerCase();
@@ -160,19 +192,37 @@
     }
 </script>
 
-{#if !rows.length}
-    <p class="text-sm text-muted-foreground p-3">No experience data available.</p>
-{:else}
-    <div class="flex flex-wrap gap-2 p-3">
-        {#each rows as row (row.skillName)}
-            <span class="inline-flex items-center gap-2 rounded-full border bg-muted px-3 py-1 text-xs font-semibold">
-                <span class="text-foreground">
-                    {#if row.level}{row.level}
-                    {/if}
-                    {formatSkillLabel(row.skillName)}
-                </span>
-                <span class="text-primary font-bold">Total XP: {formatXp(row.totalXp)}</span>
-            </span>
-        {/each}
+<section class="flex flex-col gap-2">
+    <div>
+        <h4 class="text-sm font-semibold">Skills and XP</h4>
+        <p class="text-xs text-muted-foreground">
+            For making it from scratch, counting any ingredients you make along the way.
+        </p>
     </div>
-{/if}
+    {#if !rows.length}
+        <p class="text-sm text-muted-foreground">No experience data available.</p>
+    {:else}
+        <ul class="grid gap-2">
+            {#each rows as row (row.skillName)}
+                <li class="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                    {#if skillIcon(row.skillName)}
+                        <img
+                            src={skillIcon(row.skillName)}
+                            alt=""
+                            class="h-6 w-6 shrink-0 object-contain drop-shadow"
+                        />
+                    {/if}
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium leading-tight">{formatSkillLabel(row.skillName)}</p>
+                        <p class="text-xs text-muted-foreground">
+                            {row.level ? `Needs level ${row.level}` : 'No level needed'}
+                        </p>
+                    </div>
+                    <p class="text-sm font-semibold text-primary tabular-nums whitespace-nowrap">
+                        {formatXp(row.totalXp)} XP
+                    </p>
+                </li>
+            {/each}
+        </ul>
+    {/if}
+</section>
