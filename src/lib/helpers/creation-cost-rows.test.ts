@@ -38,6 +38,7 @@ const owned =
     (...keys: CostRowKey[]) =>
     (key: CostRowKey) =>
         keys.includes(key);
+const makes = owned;
 
 describe('buildCostRows', () => {
     it('buys priced intermediates by default and does not list what they are made from', () => {
@@ -51,7 +52,7 @@ describe('buildCostRows', () => {
     });
 
     it('swaps a made intermediate for its ingredients', () => {
-        const rows = buildCostRows(longbow, { makeKeys: new Set([62]) });
+        const rows = buildCostRows(longbow, { shouldMake: makes(62) });
         expect(rows.map((row) => [row.item.name, row.depth])).toEqual([
             ['Maple longbow (u)', 0],
             ['Maple logs', 1],
@@ -62,7 +63,7 @@ describe('buildCostRows', () => {
 
     it('does not walk an owned intermediate, even one marked to be made', () => {
         const isOwned = owned(62);
-        const rows = buildCostRows(longbow, { isOwned, makeKeys: new Set([62]) });
+        const rows = buildCostRows(longbow, { isOwned, shouldMake: makes(62) });
         expect(rows.map((row) => row.item.name)).toEqual(['Maple longbow (u)', 'Bow string']);
         expect(totalCost(rows, isOwned)).toBe(105);
     });
@@ -87,17 +88,23 @@ describe('buildCostRows', () => {
 
     it('merges an item reached along two branches into one row', () => {
         const rows = buildCostRows(recipe({ item: flax, amount: 2 }, { item: bowString }), {
-            makeKeys: new Set([1777]),
+            shouldMake: makes(1777),
         });
         const flaxRow = rows.find((row) => row.key === 1779);
         expect(flaxRow).toMatchObject({ amount: 3, totalPrice: 36 });
         expect(totalCost(rows)).toBe(36);
     });
 
+    it('makes every priced intermediate when asked to, as it is for an Ironman', () => {
+        const rows = buildCostRows(longbow, { shouldMake: () => true });
+        expect(rows.map((row) => row.item.name)).toEqual(['Maple longbow (u)', 'Maple logs', 'Bow string', 'Flax']);
+        expect(totalCost(rows)).toBe(28 + 12);
+    });
+
     it('stops at a recipe that leads back to itself', () => {
         const loop = item({ id: 9, name: 'Loop', highPrice: 5 });
         loop.creationSpecs = [recipe({ item: loop })];
-        const rows = buildCostRows(recipe({ item: loop }), { makeKeys: new Set([9]) });
+        const rows = buildCostRows(recipe({ item: loop }), { shouldMake: makes(9) });
         expect(rows).toHaveLength(1);
         expect(rows[0].cyclic).toBe(true);
         expect(totalCost(rows)).toBeNull();

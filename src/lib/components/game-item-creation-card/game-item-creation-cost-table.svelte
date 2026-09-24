@@ -4,8 +4,9 @@
     import { buildCostRows, totalCost, type CostRow, type CostRowKey } from '$lib/helpers/creation-cost-rows';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
-    import { getStoreRoot } from '$lib/stores/character-store.svelte';
-    import { SvelteSet } from 'svelte/reactivity';
+    import { getActiveAccountType, getStoreRoot } from '$lib/stores/character-store.svelte';
+    import { canUseGrandExchange } from '$lib/models/account-type';
+    import { SvelteMap, SvelteSet } from 'svelte/reactivity';
     import { resolve } from '$app/paths';
 
     interface GameItemCreationCostTableProps {
@@ -40,14 +41,20 @@
 
     // Ticks the reader changed by hand. Anything they have not touched follows their supplies.
     let ownedOverrides = $state<Record<string, boolean>>({});
-    // Priced ingredients the reader chose to make instead of buy.
-    const makeKeys = new SvelteSet<CostRowKey>();
+    // Buy / Make choices the reader changed by hand. Anything untouched follows the account: an
+    // Ironman can't buy from the Grand Exchange, so for them everything that can be made is made.
+    const makeOverrides = new SvelteMap<CostRowKey, boolean>();
+    const makeByDefault = $derived(!canUseGrandExchange(getActiveAccountType()));
+
+    function shouldMake(key: CostRowKey): boolean {
+        return makeOverrides.get(key) ?? makeByDefault;
+    }
 
     function isOwned(key: CostRowKey): boolean {
         return ownedOverrides[String(key)] ?? suppliesOwned.has(String(key));
     }
 
-    const costRows = $derived(buildCostRows(rootSpec, { isOwned, makeKeys }));
+    const costRows = $derived(buildCostRows(rootSpec, { isOwned, shouldMake }));
     const allChecked = $derived(costRows.every((row) => isOwned(row.key)));
     const selectedTotal = $derived(totalCost(costRows, isOwned));
 
@@ -66,8 +73,7 @@
     }
 
     function setMade(key: CostRowKey, made: boolean) {
-        if (made) makeKeys.add(key);
-        else makeKeys.delete(key);
+        makeOverrides.set(key, made);
     }
 
     /**

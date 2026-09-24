@@ -39,8 +39,11 @@ export type CostRow = {
 export type CostRowOptions = {
     /** Whether the reader already has an ingredient. An owned ingredient is neither bought nor made. */
     isOwned?: (key: CostRowKey) => boolean;
-    /** Priced ingredients the reader has chosen to make rather than buy. */
-    makeKeys?: ReadonlySet<CostRowKey>;
+    /**
+     * Whether a priced ingredient should be made rather than bought. Defaults to buying, the way
+     * the browse list prices a creation.
+     */
+    shouldMake?: (key: CostRowKey) => boolean;
 };
 
 function rowKeyFor(item: IOsrsboxItemWithMeta): CostRowKey {
@@ -60,7 +63,7 @@ function consumingRecipe(item: IOsrsboxItemWithMeta): GameItemCreationSpecs | nu
 export function buildCostRows(spec: GameItemCreationSpecs | null | undefined, options: CostRowOptions = {}): CostRow[] {
     if (!spec) return [];
     const isOwned = options.isOwned ?? (() => false);
-    const makeKeys = options.makeKeys ?? new Set<CostRowKey>();
+    const shouldMake = options.shouldMake ?? (() => false);
     const rows = new Map<CostRowKey, CostRow>();
 
     function walk(current: GameItemCreationSpecs, multiplier: number, depth: number, path: Set<CostRowKey>) {
@@ -78,7 +81,7 @@ export function buildCostRows(spec: GameItemCreationSpecs | null | undefined, op
             const cyclic = path.has(key);
             const recipe = cyclic ? null : consumingRecipe(item);
             const mustMake = recipe !== null && unitPrice === null;
-            const made = recipe !== null && !isOwned(key) && (mustMake || makeKeys.has(key));
+            const made = recipe !== null && !isOwned(key) && (mustMake || shouldMake(key));
 
             const existing = rows.get(key);
             if (existing) {
