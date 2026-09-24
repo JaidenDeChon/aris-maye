@@ -15,6 +15,37 @@
         <link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <script>
+            // One-time migration from the old `ge-skiller-*` localStorage key prefix to
+            // `aris-maye-*` (app rename), run before any app code reads these keys.
+            (function () {
+                try {
+                    var renamedKeys = {
+                        'ge-skiller-filter-items-by-player-skills':
+                            'aris-maye-filter-items-by-player-skills',
+                        'ge-skiller-favorites': 'aris-maye-favorites',
+                        'ge-skiller-hidden': 'aris-maye-hidden',
+                        'ge-skiller-characters': 'aris-maye-characters',
+                        'ge-skiller-recent-searches': 'aris-maye-recent-searches',
+                        'ge-skiller-items-page-preferences': 'aris-maye-items-page-preferences',
+                        'ge-skiller-bank-items': 'aris-maye-bank-items',
+                    };
+                    for (var oldKey in renamedKeys) {
+                        var newKey = renamedKeys[oldKey];
+                        var oldValue = localStorage.getItem(oldKey);
+                        if (oldValue === null) continue;
+                        if (localStorage.getItem(newKey) === null) {
+                            localStorage.setItem(newKey, oldValue);
+                        }
+                        localStorage.removeItem(oldKey);
+                    }
+                } catch (e) {
+                    // localStorage unavailable (e.g. disabled/private mode); nothing to migrate.
+                }
+            })();
+        </script>
+
         %sveltekit.head%
     </head>
     <body data-sveltekit-preload-data="hover">

@@ -6,6 +6,8 @@ export type ItemsPagePreferences = {
     sortOrder: string;
     perPage: string;
     page: number;
+    useSupplies: boolean;
+    profitMode: boolean;
 };
 
 export const itemsPagePreferences = persisted<ItemsPagePreferences>(LocalStorageStoreNames.ITEMS_PAGE_PREFERENCES, {
@@ -13,4 +15,6 @@ export const itemsPagePreferences = persisted<ItemsPagePreferences>(LocalStorage
     sortOrder: 'desc',
     perPage: '12',
     page: 1,
+    useSupplies: false,
+    profitMode: false,
 });

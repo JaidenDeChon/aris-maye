@@ -69,7 +69,7 @@
                         </a>
                     </Tooltip.Trigger>
                     <Tooltip.Content>
-                        <p>About ge-skiller</p>
+                        <p>About Aris Maye</p>
                     </Tooltip.Content>
                 </Tooltip.Root>
             </Tooltip.Provider>
@@ -86,7 +86,7 @@
                     >
                         <a
                             class="h-full w-full flex items-center justify-center"
-                            href="https://github.com/JaidenDeChon/ge-skiller"
+                            href="https://github.com/JaidenDeChon/aris-maye"
                             target="_blank"
                         >
                             <SiGithub />

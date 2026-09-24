@@ -34,7 +34,7 @@ export async function fetchCharacterDetailsFromWOM(characterName: string): Promi
         headers: {
             'Content-Type': 'application/json',
             'X-Client':
-                `This API call came from a ${envName} instance of ge-skiller (https://ge-skiller.netlify.app). ` +
+                `This API call came from a ${envName} instance of aris-maye (https://aris-maye.netlify.app). ` +
                 'Please contact Jaiden with any issues at `jaiden.dechon@proton.me` -- Thank you for your API!',
         },
     });

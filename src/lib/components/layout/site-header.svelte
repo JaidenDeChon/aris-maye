@@ -81,7 +81,7 @@
         />
 
         <a href={resolve('/')} aria-label="logo and home link">
-            <span class="rs-font-with-shadow text-primary text-xl">ge-skiller</span>
+            <span class="rs-font-with-shadow text-primary text-xl">Aris Maye</span>
         </a>
 
         <!-- Button that looks like search bar; opens command modal. -->
@@ -106,6 +106,7 @@
                                     <Command.LinkItem
                                         href={`/items/${item.id}`}
                                         class="cursor-pointer"
+                                        data-sveltekit-preload-data="hover"
                                         onclick={() => handleSearchResultSelect(item)}
                                     >
                                         <div
@@ -151,6 +152,7 @@
                                     <Command.LinkItem
                                         href={`/items/${entry.item.id}`}
                                         class="cursor-pointer"
+                                        data-sveltekit-preload-data="hover"
                                         onclick={() => handleRecentSearchSelect(entry)}
                                     >
                                         <div

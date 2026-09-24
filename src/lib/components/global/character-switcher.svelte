@@ -4,6 +4,8 @@
     import { User, ChevronsUpDown, Plus, X, Pencil } from 'lucide-svelte';
     import { buttonVariants } from '$lib/components/ui/button';
     import { getStoreRoot } from '$lib/stores/character-store.svelte';
+    import { getAccountTypeOption, isIronmanAccount } from '$lib/models/account-type';
+    import { removeSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { Button } from '$lib/components/ui/button';
     import * as Sidebar from '$lib/components/ui/sidebar';
     import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -18,10 +20,16 @@
     const store = $derived(getStoreRoot());
     const characterList = $derived(store.characters);
 
-    const activeCharacterName = $derived.by(() => {
+    const activeCharacter = $derived.by(() => {
         const activeId = store.activeCharacter;
-        return store.characters.find((c) => activeId === c.id)?.name || 'None selected';
+        return store.characters.find((c) => activeId === c.id);
     });
+    const activeCharacterName = $derived(activeCharacter?.name || 'My character');
+
+    // The mode has to be visible wherever the character is. Reading shop-and-alchemy numbers while
+    // believing they are Grand Exchange numbers is the one failure this feature can't afford.
+    const activeAccountType = $derived(getAccountTypeOption(activeCharacter?.accountType));
+    const showAccountBadge = $derived(Boolean(activeCharacter) && isIronmanAccount(activeCharacter?.accountType));
 
     /**
      * Remove a character from the character list. If the removed character is the active character, sets the active
@@ -32,6 +40,7 @@
         // Compute next list and persist it.
         const next = store.characters.filter((c) => c.id !== character.id);
         store.characters = next;
+        removeSuppliesForCharacter(character.id);
 
         toast.info(`Character "${character.name}" has been removed.`);
 
@@ -91,7 +100,17 @@
                 </div>
                 <div class="grid flex-1 text-left text-sm leading-tight">
                     <span class="truncate font-semibold">Select Character</span>
-                    <span class="truncate text-xs text-muted-foreground">{activeCharacterName}</span>
+                    <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span class="truncate">{activeCharacterName}</span>
+                        {#if showAccountBadge}
+                            <span
+                                class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                title="{activeAccountType.label} — prices don't use the Grand Exchange"
+                            >
+                                {activeAccountType.shortLabel}
+                            </span>
+                        {/if}
+                    </span>
                 </div>
                 <ChevronsUpDown class="ml-auto" />
             </Sidebar.MenuButton>
@@ -110,8 +129,19 @@
             {#each characterList as character (character.id ?? character.name)}
                 <div class="flex gap-1">
                     <!-- "Add character" button -->
-                    <Button variant="ghost" class="flex-1" onclick={() => selectCharacter(character)}>
-                        {character.name}
+                    <Button
+                        variant="ghost"
+                        class="flex-1 !justify-start gap-1.5"
+                        onclick={() => selectCharacter(character)}
+                    >
+                        <span class="truncate">{character.name}</span>
+                        {#if isIronmanAccount(character.accountType)}
+                            <span
+                                class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            >
+                                {getAccountTypeOption(character.accountType).shortLabel}
+                            </span>
+                        {/if}
                     </Button>
 
                     <!-- Remove character from store's `characters` list. -->

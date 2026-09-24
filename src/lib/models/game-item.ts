@@ -42,6 +42,7 @@ export type GameItemCreationSpecs = {
     experienceGranted: GameItemCreationExperienceGranted[];
     requiredSkills: SkillLevelDesignation[];
     ingredients: GameItemCreationIngredient[];
+    treeMinSkills?: Record<string, number> | null;
 };
 
 /**
@@ -65,6 +66,10 @@ export type IGameItem = {
         lowTime?: number;
         buyLimit?: number;
         wikiName?: string | null;
+        creationCost?: number | null;
+        creationProfit?: number | null;
+        creationRoi?: number | null;
+        ironmanExitValue?: number | null;
     };
 
 /**

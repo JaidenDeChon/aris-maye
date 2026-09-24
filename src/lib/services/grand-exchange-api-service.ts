@@ -2,7 +2,7 @@ import type * as Types from '../models/grand-exchange-protocols';
 
 const headers = {
     'User-Agent':
-        'npm runelite | ge-skiller | Helps OSRS players turn their skilling processes into more valuable ' +
+        'npm runelite | aris-maye | Helps OSRS players turn their skilling processes into more valuable ' +
         'ventures. | Contact: me@jaiden.foo',
 };
 

@@ -1,4 +1,4 @@
-# GE Skiller
+# Aris Maye
 
 SvelteKit application for Old School RuneScape skilling and Grand Exchange browsing. Developed primarily with [Bun](https://bun.sh/) as the runtime.
 

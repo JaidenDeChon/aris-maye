@@ -2,7 +2,7 @@
     import { page } from '$app/state';
     import * as Sidebar from '$lib/components/ui/sidebar';
     import { skillTreePages } from '$lib/constants/skill-tree-pages';
-    import { Home, Heart, Sword, EyeOff } from 'lucide-svelte';
+    import { Home, Heart, Sword, EyeOff, User } from 'lucide-svelte';
     import { favoritesStore } from '$lib/stores/favorites-store';
     import { hiddenStore } from '$lib/stores/hidden-store';
     import { resolve } from '$app/paths';
@@ -28,6 +28,11 @@
             title: 'Browse items',
             url: '/items',
             icon: Sword,
+        },
+        {
+            title: 'My character',
+            url: '/my-character',
+            icon: User,
         },
         {
             title: 'Favorites',

@@ -72,6 +72,7 @@ const creationSpecsSchema = new Schema<GameItemCreationSpecs>(
         experienceGranted: { type: [creationExperienceSchema], default: [] },
         requiredSkills: { type: [creationRequiredSkillSchema], default: [] },
         ingredients: { type: [creationIngredientSchema], default: [] },
+        treeMinSkills: { type: Schema.Types.Mixed, default: null },
     },
     { _id: false },
 );
@@ -108,6 +109,26 @@ export const osrsboxItemSchema: Schema<OsrsboxItemDocument> = new Schema(
         icon: { type: String, required: true },
         wiki_name: { type: String, default: null },
         wiki_url: { type: String, default: null },
+        wiki_page_title: { type: String, default: null },
+        wiki_version: { type: String, default: null },
+        // Populated by `populate-store-prices`, which scrapes shop pages rather than item
+        // pages: the terms live in template parameters the item page never renders.
+        storePrices: {
+            type: [
+                {
+                    _id: false,
+                    shop: { type: String, required: true },
+                    firstPrice: { type: Number, required: true },
+                    floorPrice: { type: Number, required: true },
+                    dropPerSale: { type: Number, required: true },
+                    salesToFloor: { type: Number, default: null },
+                    buyPrice: { type: Number, default: null },
+                    stock: { type: Number, default: null },
+                    currency: { type: String, default: null },
+                },
+            ],
+            default: undefined,
+        },
         equipment: { type: Schema.Types.Mixed, default: null },
         weapon: { type: Schema.Types.Mixed, default: null },
         highPrice: { type: Number, required: false },
@@ -118,6 +139,11 @@ export const osrsboxItemSchema: Schema<OsrsboxItemDocument> = new Schema(
     },
     { collection: 'items' },
 );
+
+// Covers the browse-page base filter and its highPrice sort so listing queries
+// don't collection-scan; the name index serves prefix-anchored search regexes.
+osrsboxItemSchema.index({ tradeable_on_ge: 1, placeholder: 1, noted: 1, stacked: 1, highPrice: -1 });
+osrsboxItemSchema.index({ name: 1 });
 
 export const OsrsboxItemModel: Model<OsrsboxItemDocument> =
     mongoose.models.OsrsboxItem || mongoose.model<OsrsboxItemDocument>('OsrsboxItem', osrsboxItemSchema);

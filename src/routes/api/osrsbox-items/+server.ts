@@ -123,6 +123,8 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 };
 
+const SENTINEL_PRICE = 2147483647;
+
 function toNumber(value: unknown, field: string, required = false): number | null {
     if (value === null || value === undefined || value === '') {
         if (required) throw new Error(`${field} is required.`);
@@ -150,6 +152,19 @@ function toStringOrNull(value: unknown): string | null {
     return trimmed ? trimmed : null;
 }
 
+function sanitizePrice(value: number | null): number | null {
+    if (value === null) return null;
+    if (!Number.isFinite(value)) return null;
+    if (value <= 0 || value >= SENTINEL_PRICE) return null;
+    return value;
+}
+
+function sanitizeTime(value: number | null): number | null {
+    if (value === null) return null;
+    if (!Number.isFinite(value)) return null;
+    return value > 0 ? value : null;
+}
+
 async function normalizePayload(raw: IncomingPayload) {
     const id = toNumber(raw.id, 'id', true);
     const cost = toNumber(raw.cost, 'cost', true);
@@ -159,6 +174,11 @@ async function normalizePayload(raw: IncomingPayload) {
     if (!raw.icon?.trim()) throw new Error('Icon (base64) is required.');
 
     const creationSpecs = await normalizeCreationSpecs(raw.creationSpecs ?? []);
+
+    const highPrice = sanitizePrice(toNumber(raw.highPrice, 'highPrice'));
+    const lowPrice = sanitizePrice(toNumber(raw.lowPrice, 'lowPrice'));
+    const highTime = highPrice !== null ? sanitizeTime(toNumber(raw.highTime, 'highTime')) : null;
+    const lowTime = lowPrice !== null ? sanitizeTime(toNumber(raw.lowTime, 'lowTime')) : null;
 
     return {
         id,
@@ -194,10 +214,10 @@ async function normalizePayload(raw: IncomingPayload) {
         equipment: raw.equipment ?? null,
         weapon: raw.weapon ?? null,
         creationSpecs,
-        highPrice: toNumber(raw.highPrice, 'highPrice'),
-        highTime: toNumber(raw.highTime, 'highTime'),
-        lowPrice: toNumber(raw.lowPrice, 'lowPrice'),
-        lowTime: toNumber(raw.lowTime, 'lowTime'),
+        highPrice,
+        highTime,
+        lowPrice,
+        lowTime,
     };
 }
 

@@ -4,6 +4,7 @@ interface HomepageData {
 
 const npcImages: string[] = [
     'aggie.webp',
+    'aris-maye.png',
     'carpenter.webp',
     'duke-horacio.webp',
     'forestry-f.webp',
@@ -37,7 +38,7 @@ async function assembleHomepageData(): Promise<HomepageData['imageUrl']> {
         return `/npc-images/${randomImage}`;
     } catch {
         // Fallback to a default image.
-        return '/npc-images/charlie-the-tramp.png';
+        return '/npc-images/aris-maye.png';
     }
 }
 

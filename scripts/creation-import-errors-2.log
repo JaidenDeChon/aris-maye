@@ -1,10 +1,4 @@
 # Creation import unresolved ingredient report
-# Generated at 2025-12-07T16:01:21.470Z
+# Generated at 2026-02-02T02:00:18.139Z
 
-## Unresolved ingredient names (could not map to OsrsboxItem):
-- _id=69281223b293fc9f9a45d8e4 | name="Uncooked stew" | ingredient="Incomplete stew#Potato"
-- _id=69281223b293fc9f9a45d8e4 | name="Uncooked stew" | ingredient="Incomplete stew#Potato"
-- _id=6934c7d5b293fc9f9a47100c | name="Incomplete stew#meat" | ingredient="Incomplete stew#Potato"
-- _id=6934c839b293fc9f9a471ef9 | name="Uncooked stew" | ingredient="Incomplete stew#Potato"
-- _id=6934c839b293fc9f9a471ef9 | name="Uncooked stew" | ingredient="Incomplete stew#Potato"
-- _id=693591fcb293fc9f9a4735b6 | name="Atlatl dart shaft" | ingredient="Ent branch"
+No unresolved ingredient names recorded.

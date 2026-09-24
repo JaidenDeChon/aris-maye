@@ -12,10 +12,16 @@
         gameItem: IOsrsboxItemWithMeta | null;
         loading: boolean;
         renderChart: boolean;
+        /**
+         * A newer item's tree is on its way while the previous one is still rendered. The card
+         * stays as it is — swapping it for skeletons would destroy the chart and lose the
+         * animation into the new tree — and says so instead.
+         */
+        refreshing?: boolean;
         rootClass?: string;
     }
 
-    const { gameItem, loading, renderChart, rootClass = '' }: GameItemTreeCardProps = $props();
+    const { gameItem, loading, renderChart, refreshing = false, rootClass = '' }: GameItemTreeCardProps = $props();
     const creationSpec = $derived(getPrimaryCreationSpec(gameItem));
     const creationSpecs = $derived((gameItem?.creationSpecs ?? []) as GameItemCreationSpecs[]);
     const specOptions = $derived(
@@ -38,7 +44,7 @@
     const hasIngredients = $derived(renderChart && !!selectedSpec?.ingredients?.length);
 </script>
 
-<Card.Root class={rootClass}>
+<Card.Root class={rootClass} aria-busy={loading || refreshing}>
     {#if loading}
         <Skeleton class="w-48 max-w-full h-5 ml-5 mt-8 mb-2" />
         <Skeleton class="w-60 max-w-full h-3 ml-5 mt-4 mb-2" />
@@ -51,6 +57,9 @@
                 {hasIngredients
                     ? 'XP and GP you stand to gain when creating this item'
                     : 'This item has no ingredients.'}
+                {#if refreshing}
+                    <span class="text-muted-foreground/80">· Updating…</span>
+                {/if}
             </Card.Description>
         </Card.Header>
 

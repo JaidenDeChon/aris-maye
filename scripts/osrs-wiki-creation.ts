@@ -5,6 +5,49 @@ import * as cheerio from 'cheerio';
  */
 const OSRS_WIKI_API = 'https://oldschool.runescape.wiki/api.php';
 
+/**
+ * Minimum gap between wiki requests, in milliseconds.
+ *
+ * A full rescrape previously ran unthrottled at roughly 349 req/min (~3.2 wiki calls per
+ * item at 1.8 items/sec), which earned a burst of 403s about four hours in — 427 items
+ * were skipped before the run was stopped. 400ms holds the pass to ~150 req/min, well
+ * under the rate that drew the block.
+ *
+ * Override with WIKI_MIN_REQUEST_MS to go slower still; 0 disables the throttle.
+ */
+const MIN_REQUEST_INTERVAL_MS = Number(process.env.WIKI_MIN_REQUEST_MS ?? 400);
+
+/**
+ * Identifies the scraper, per the wiki's API etiquette. An unidentified client is the
+ * first thing a rate limiter drops. Set WIKI_USER_AGENT to add contact details.
+ */
+const USER_AGENT = process.env.WIKI_USER_AGENT ?? 'aris-maye/0.0.1 (OSRS crafting-profit tool)';
+
+/**
+ * Backoff waits after a rate-limited response, in milliseconds. One entry per retry, so
+ * a request gets RATE_LIMIT_BACKOFF_MS.length + 1 attempts before the item is skipped.
+ */
+const RATE_LIMIT_BACKOFF_MS = [2_000, 8_000, 32_000];
+
+/** Next timestamp at which a request may go out; each caller reserves its own slot. */
+let nextRequestAllowedAt = 0;
+
+/**
+ * Waits until this caller's reserved slot in the request schedule comes up.
+ *
+ * The slot is reserved before awaiting, so concurrent callers queue behind each other
+ * rather than all reading the same "last request" time and firing together.
+ */
+async function throttleWikiRequest(): Promise<void> {
+    if (MIN_REQUEST_INTERVAL_MS <= 0) return;
+
+    const now = Date.now();
+    const waitMs = Math.max(0, nextRequestAllowedAt - now);
+    nextRequestAllowedAt = Math.max(now, nextRequestAllowedAt) + MIN_REQUEST_INTERVAL_MS;
+
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+}
+
 export type WikiItemRef = {
     name: string;
     href?: string; // /w/Item_name
@@ -54,12 +97,30 @@ async function wikiApi(params: Record<string, string>): Promise<WikiParseRespons
         ...params,
     }).forEach(([k, v]) => url.searchParams.set(k, v));
 
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-        throw new Error(`OSRS wiki API error: ${res.status} ${res.statusText}`);
+    // A throttled block is transient, but the caller treats any throw as "this item has no
+    // recipe" and moves on — so an unretried 403 silently leaves stale data behind. Back
+    // off and let the limiter's window pass before giving up on the item.
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < RATE_LIMIT_BACKOFF_MS.length + 1; attempt++) {
+        await throttleWikiRequest();
+
+        const res = await fetch(url.toString(), { headers: { 'User-Agent': USER_AGENT } });
+        if (res.ok) return (await res.json()) as WikiParseResponse;
+
+        lastError = new Error(`OSRS wiki API error: ${res.status} ${res.statusText}`);
+
+        const retryable = res.status === 403 || res.status === 429 || res.status >= 500;
+        const backoffMs = RATE_LIMIT_BACKOFF_MS[attempt];
+        if (!retryable || backoffMs === undefined) break;
+
+        console.warn(
+            `⏸️  [osrs-wiki] ${res.status} ${res.statusText} — backing off ${backoffMs / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_BACKOFF_MS.length})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
     }
 
-    return (await res.json()) as WikiParseResponse;
+    throw lastError ?? new Error('OSRS wiki API error: request failed');
 }
 
 function buildMethodFromCaptionTables(
@@ -97,7 +158,7 @@ function buildMethodFromCaptionTables(
 }
 
 /**
- * Step 1: fetch the list of sections for a page and find the "Creation" section index.
+ * Step 1: fetch the list of sections for a page and find the "Creation" (or "Recipe") section index.
  */
 async function getCreationSectionIndex(title: string): Promise<number | null> {
     const data = await wikiApi({
@@ -108,7 +169,10 @@ async function getCreationSectionIndex(title: string): Promise<number | null> {
 
     const sections: { index: string; line: string }[] = data?.parse?.sections ?? [];
 
-    const creationSection = sections.find((s) => s.line.toLowerCase().trim() === 'creation');
+    const creationSection = sections.find((s) => {
+        const line = s.line.toLowerCase().trim();
+        return line === 'creation' || line === 'recipe';
+    });
 
     if (!creationSection) return null;
 
@@ -155,6 +219,10 @@ type CaptionTable = {
     $table: cheerio.Cheerio;
 };
 
+function normalizeWhitespace(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
+}
+
 function extractCaptionTables($: cheerio.CheerioAPI, root?: cheerio.Cheerio): CaptionTable[] {
     const result: CaptionTable[] = [];
     const scope = root ?? $.root();
@@ -168,6 +236,139 @@ function extractCaptionTables($: cheerio.CheerioAPI, root?: cheerio.Cheerio): Ca
     });
 
     return result;
+}
+
+function buildMethodsFromSwitchInfoboxes(
+    $: cheerio.CheerioAPI,
+    pageTitle: string,
+    scope: cheerio.Cheerio,
+    methodNamePrefix?: string,
+    options?: { ignoreWithinSelectors?: string[] },
+): CreationMethod[] {
+    const methods: CreationMethod[] = [];
+
+    const $switches = scope.find('.switch-infobox');
+    if ($switches.length === 0) return methods;
+
+    $switches.each((_, el) => {
+        const $switch = $(el);
+        if (
+            options?.ignoreWithinSelectors?.some((selector) => $switch.closest(selector).length > 0)
+        ) {
+            return;
+        }
+        const triggerLabels = new Map<string, string>();
+
+        $switch.find('.switch-infobox-triggers .trigger').each((_, triggerEl) => {
+            const $trigger = $(triggerEl);
+            const id = $trigger.attr('data-id')?.trim();
+            if (!id) return;
+
+            const label = normalizeWhitespace($trigger.text());
+            triggerLabels.set(id, label || id);
+        });
+
+        $switch.find('div.item').each((_, itemEl) => {
+            const $item = $(itemEl);
+            const dataId = $item.attr('data-id')?.trim();
+            const label = dataId ? triggerLabels.get(dataId) : undefined;
+            const methodName = label && methodNamePrefix ? `${methodNamePrefix}: ${label}` : label ?? methodNamePrefix;
+
+            const captionTables = extractCaptionTables($, $item);
+            if (captionTables.length === 0) return;
+
+            const method = buildMethodFromCaptionTables($, pageTitle, captionTables, methodName);
+            methods.push(method);
+        });
+    });
+
+    return methods;
+}
+
+function buildMethodsFromRecipeTables(
+    $: cheerio.CheerioAPI,
+    pageTitle: string,
+    scope: cheerio.Cheerio,
+    options?: { ignoreWithinSelectors?: string[] },
+): CreationMethod[] {
+    const methods: CreationMethod[] = [];
+
+    const $recipes = scope.find('.recipe-table');
+    if ($recipes.length === 0) return methods;
+
+    $recipes.each((_, el) => {
+        const $recipe = $(el);
+        if (
+            options?.ignoreWithinSelectors?.some((selector) => $recipe.closest(selector).length > 0)
+        ) {
+            return;
+        }
+
+        const captionTables = extractCaptionTables($, $recipe);
+        if (captionTables.length === 0) return;
+
+        const method = buildMethodFromCaptionTables($, pageTitle, captionTables);
+        methods.push(method);
+    });
+
+    return methods;
+}
+
+function buildMethodsFromTabbers(
+    $: cheerio.CheerioAPI,
+    pageTitle: string,
+    scope: cheerio.Cheerio,
+): CreationMethod[] {
+    const methods: CreationMethod[] = [];
+
+    const pushTabMethods = ($tab: cheerio.Cheerio, rawMethodName?: string) => {
+        const methodName = rawMethodName ? normalizeWhitespace(rawMethodName) : undefined;
+
+        const switchMethods = buildMethodsFromSwitchInfoboxes($, pageTitle, $tab, methodName);
+        if (switchMethods.length > 0) {
+            methods.push(...switchMethods);
+            return;
+        }
+
+        const captionTables = extractCaptionTables($, $tab);
+        if (captionTables.length === 0) return;
+
+        const method = buildMethodFromCaptionTables($, pageTitle, captionTables, methodName);
+        methods.push(method);
+    };
+
+    const $tabbers = scope.find('.tabber');
+    if ($tabbers.length > 0) {
+        $tabbers.each((_, tabberEl) => {
+            const $tabber = $(tabberEl);
+            let $tabs = $tabber.find('> .tabbertab');
+
+            if ($tabs.length === 0) {
+                $tabs = $tabber.children(
+                    'div[data-title], div[title], div[data-hash], section[data-title], section[title], section[data-hash]',
+                );
+            }
+
+            $tabs.each((_, tabEl) => {
+                const $tab = $(tabEl);
+                const methodName = $tab.attr('data-title') || $tab.attr('title') || $tab.attr('data-hash') || undefined;
+                pushTabMethods($tab, methodName);
+            });
+        });
+
+        return methods;
+    }
+
+    const $tabs = scope.find('.tabbertab');
+    if ($tabs.length === 0) return methods;
+
+    $tabs.each((_, tabEl) => {
+        const $tab = $(tabEl);
+        const methodName = $tab.attr('data-title') || $tab.attr('title') || $tab.attr('data-hash') || undefined;
+        pushTabMethods($tab, methodName);
+    });
+
+    return methods;
 }
 
 /**
@@ -266,8 +467,17 @@ function parseRequirementsTable($: cheerio.CheerioAPI, $table: cheerio.Cheerio):
  *   - second column: item link
  *   - third column: quantity
  *   - fourth column: cost
- * And which may also contain the *product* row (selflink to current page)
- * plus Total cost / Profit rows.
+ * And which may also contain the *product* row plus Total cost / Profit rows.
+ *
+ * The wiki's recipe template lays the rows out as inputs, then a `Total cost` header row,
+ * then the output, then Profit rows — so that header is what separates the two, and it is
+ * the only signal that survives a variant panel. Name-based detection cannot: on the
+ * "Poison" panel of `Adamant dagger` the *input* is the selflink `Adamant dagger` and the
+ * *output* is `Adamant dagger(p)`, which links away to its own redirect page. Reading
+ * those by name got the recipe exactly backwards, leaving the poisoned dagger listed as
+ * an ingredient of itself.
+ *
+ * Tables with no `Total cost` row fall back to the original name-based rule.
  */
 function parseMaterialsAndInlineProducts(
     $: cheerio.CheerioAPI,
@@ -280,6 +490,18 @@ function parseMaterialsAndInlineProducts(
     const $rows = $table.find('tr');
     if ($rows.length === 0) return { materials, products };
 
+    const isTotalCostRow = ($row: cheerio.Cheerio): boolean => {
+        const firstCell = $row.find('td, th').first();
+        return firstCell.is('th') && /total cost/.test(firstCell.text().toLowerCase().trim());
+    };
+
+    let hasTotalCostRow = false;
+    $rows.slice(1).each((_, row) => {
+        if (isTotalCostRow($(row))) hasTotalCostRow = true;
+    });
+
+    let pastTotalCost = false;
+
     $rows.slice(1).each((_, row) => {
         const $row = $(row);
         const $cells = $row.find('td, th');
@@ -291,6 +513,7 @@ function parseMaterialsAndInlineProducts(
         if (firstCell.is('th')) {
             const headerText = firstCell.text().toLowerCase().trim();
             if (/total cost|profit after ge tax|profit/.test(headerText) && headerText.length > 0) {
+                if (/total cost/.test(headerText)) pastTotalCost = true;
                 return;
             }
         }
@@ -344,15 +567,23 @@ function parseMaterialsAndInlineProducts(
         const nameLower = normalizedName.toLowerCase();
         const titleLower = normalizedTitle.toLowerCase();
 
-        // Treat as product if:
+        let isNumericParenVariant = false;
+        let isUnstrungVariant = false;
+        if (nameLower.startsWith(titleLower)) {
+            const remainder = nameLower.slice(titleLower.length).trim();
+            isUnstrungVariant = remainder === '(u)' || remainder === '(unstrung)';
+            isNumericParenVariant = /^\(\d+(?:\s*\/\s*\d+)?\)$/.test(remainder);
+        }
+
+        // Position wins where the template provides it: everything above `Total cost` is an
+        // input and everything below it is an output, whatever the rows are named.
+        // Otherwise treat as product if:
         // - it's the selflink (same page), OR
         // - exact match, OR
-        // - it's a dose/variant that starts with the page title, e.g. "prayer potion(3)"
-        const isProductRow =
-            selfLink.length > 0 ||
-            nameLower === titleLower ||
-            nameLower.startsWith(titleLower + ' (') || // e.g. "item (something)"
-            nameLower.startsWith(titleLower + '('); // e.g. "prayer potion(3)"
+        // - it's a numeric dose/charge variant like "prayer potion(3)" or "ring of recoil (8)"
+        const isProductRow = hasTotalCostRow
+            ? pastTotalCost
+            : selfLink.length > 0 || nameLower === titleLower || (isNumericParenVariant && !isUnstrungVariant);
 
         if (isProductRow) {
             products.push({
@@ -441,24 +672,25 @@ export function parseCreationSectionToMethods(pageTitle: string, creationHtml: s
 
     const methods: CreationMethod[] = [];
 
-    const $tabs = $('.tabbertab');
-    if ($tabs.length > 0) {
-        // Multi-method case: one method per tab (Needle / Costume needle, etc.)
-        $tabs.each((_, el) => {
-            const $tab = $(el);
-            const methodName = $tab.attr('data-title') || $tab.attr('data-hash') || undefined; // e.g. "Needle", "Costume needle"
+    methods.push(...buildMethodsFromTabbers($, pageTitle, $.root()));
 
-            const captionTables = extractCaptionTables($, $tab);
-            if (captionTables.length === 0) return;
+    methods.push(
+        ...buildMethodsFromSwitchInfoboxes($, pageTitle, $.root(), undefined, {
+            ignoreWithinSelectors: ['.tabber'],
+        }),
+    );
 
-            const method = buildMethodFromCaptionTables($, pageTitle, captionTables, methodName);
-            methods.push(method);
-        });
+    methods.push(
+        ...buildMethodsFromRecipeTables($, pageTitle, $.root(), {
+            ignoreWithinSelectors: ['.tabber', '.switch-infobox'],
+        }),
+    );
 
+    if (methods.length > 0) {
         return methods;
     }
 
-    // Single-method case (no tabber; e.g. rune platebody, prayer potion...)
+    // Single-method fallback (no structured containers; e.g. rune platebody, prayer potion...)
     const captionTables = extractCaptionTables($);
     if (captionTables.length === 0) {
         return [];
@@ -468,16 +700,24 @@ export function parseCreationSectionToMethods(pageTitle: string, creationHtml: s
     return [single];
 }
 
-export async function getCreationMethodsForItem(pageTitle: string): Promise<CreationMethod[]> {
+export async function getCreationMethodsForItem(
+    pageTitle: string,
+    options: { silent?: boolean } = { silent: true },
+): Promise<CreationMethod[]> {
+    const silent = options.silent ?? true;
     const sectionIndex = await getCreationSectionIndex(pageTitle);
     if (sectionIndex == null) {
-        console.log(`⚠️ [creation-importer] No creation section found for page "${pageTitle}".`);
+        if (!silent) {
+            console.log(`⚠️ [creation-importer] No creation section found for page "${pageTitle}".`);
+        }
         return [];
     }
 
     const html = await getCreationSectionHtml(pageTitle, sectionIndex);
     if (!html) {
-        console.log(`⚠️ [creation-importer] No creation HTML found for page "${pageTitle}".`);
+        if (!silent) {
+            console.log(`⚠️ [creation-importer] No creation HTML found for page "${pageTitle}".`);
+        }
         return [];
     }
 

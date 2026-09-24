@@ -7,6 +7,7 @@ import consola from 'consola';
 import logUpdate from 'log-update';
 import { OsrsboxItemModel } from '../src/lib/models/mongo-schemas/osrsbox-db-item-schema';
 import type { IOsrsboxItem } from '../src/lib/models/osrsbox-db-item';
+import { deriveWikiPageIdentity } from '../src/lib/helpers/wiki-page-title';
 
 /**
  * ====================================================================================================================
@@ -72,6 +73,8 @@ const MAX_CONSECUTIVE_404 = 500;
 const BATCH_SIZE = 12;
 const MONGODB_REQUEST_POLITENESS_DELAY_MS = 0;
 const LOCAL_ITEMS_DIR = new URL('./osrsbox-db/docs/items-json/', import.meta.url);
+const SKIP_UNTRADEABLE = process.env.OSRSBOX_SKIP_UNTRADEABLE === 'true';
+const SKIP_NOTED = process.env.OSRSBOX_SKIP_NOTED === 'true';
 
 const user = process.env.VITE_MONGO_USERNAME;
 const pw = process.env.VITE_MONGO_PASSWORD;
@@ -147,10 +150,20 @@ async function upsertGameItems(
         // Preserve any existing creationSpecs by never updating them from this source.
         const { creationSpecs, ...itemWithoutCreationSpecs } = item;
 
+        // OSRSBox has no field for the real wiki page title, so derive it on the way in.
+        // Doing it here (rather than only in a repair pass) keeps re-imports correct.
+        const { wikiPageTitle, wikiVersion } = deriveWikiPageIdentity(item);
+
         const update: {
             $set: typeof itemWithoutCreationSpecs;
             $setOnInsert?: { creationSpecs: IOsrsboxItem['creationSpecs'] };
-        } = { $set: itemWithoutCreationSpecs };
+        } = {
+            $set: {
+                ...itemWithoutCreationSpecs,
+                wiki_page_title: wikiPageTitle,
+                wiki_version: wikiVersion,
+            },
+        };
 
         if (creationSpecs !== undefined) {
             update.$setOnInsert = { creationSpecs };
@@ -228,8 +241,8 @@ async function importItemsFrom(params: { baseUrl: URL; sourceName: string; start
                 fetchedCount += 1;
                 consecutive404 = 0;
 
-                // Skip untradeable and noted items.
-                if (!item.tradeable || item.noted) {
+                // Optional filters (default is to import everything).
+                if ((SKIP_UNTRADEABLE && !item.tradeable) || (SKIP_NOTED && item.noted)) {
                     skippedTotal += 1;
                     continue;
                 }

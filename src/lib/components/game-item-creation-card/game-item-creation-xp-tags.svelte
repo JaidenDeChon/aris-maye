@@ -9,7 +9,7 @@
 
     const { gameItem, creationSpec = null }: GameItemCreationXpTagsProps = $props();
 
-    type SkillXpRow = { skillName: string; stepXp: number; totalXp: number; level?: number };
+    type SkillXpRow = { skillName: string; totalXp: number; level?: number };
 
     const creationSpecs = $derived(
         creationSpec ? [creationSpec] : ((gameItem?.creationSpecs ?? []) as GameItemCreationSpecs[]),
@@ -36,24 +36,27 @@
     }
 
     function buildRequiredLevels(spec: GameItemCreationSpecs): Record<string, number> {
-        return Object.fromEntries(
-            (spec.requiredSkills ?? [])
-                .filter((req) => req?.skillName && typeof req.skillLevel === 'number')
-                .map((req) => [req.skillName.toLowerCase(), req.skillLevel ?? 0]),
-        );
+        const levels: Record<string, number> = {};
+        const seed = spec.treeMinSkills ?? null;
+        if (seed) {
+            for (const [skill, level] of Object.entries(seed)) {
+                addSkillLevel(levels, skill, level);
+            }
+        }
+
+        accumulateRequiredLevels(spec, levels, new Set());
+        return levels;
     }
 
     function buildXpRows(spec: GameItemCreationSpecs, requiredLevels: Record<string, number>): SkillXpRow[] {
-        const stepMap = accumulateExperience(spec, 1, false, new Set());
         const totalMap = accumulateExperience(spec, 1, true, new Set());
 
-        const skills = new Set([...stepMap.keys(), ...totalMap.keys(), ...Object.keys(requiredLevels)]);
+        const skills = new Set([...totalMap.keys(), ...Object.keys(requiredLevels)]);
         return Array.from(skills)
             .map((skillName) => ({
                 skillName,
-                stepXp: stepMap.get(skillName) ?? 0,
                 totalXp: totalMap.get(skillName) ?? 0,
-                level: requiredLevels[skillName.toLowerCase()],
+                level: requiredLevels[skillName],
             }))
             .sort((a, b) => b.totalXp - a.totalXp);
     }
@@ -69,7 +72,8 @@
 
         for (const xp of spec.experienceGranted ?? []) {
             if (!xp?.skillName || xp.experienceAmount === undefined || xp.experienceAmount === null) continue;
-            const key = xp.skillName;
+            const key = normalizeSkillName(xp.skillName);
+            if (!key) continue;
             const amount = xp.experienceAmount * multiplier;
             map.set(key, (map.get(key) ?? 0) + amount);
         }
@@ -101,6 +105,59 @@
 
         return map;
     }
+
+    function normalizeSkillName(name: string | null | undefined): string | null {
+        if (!name) return null;
+        const trimmed = name.trim().toLowerCase();
+        return trimmed.length ? trimmed : null;
+    }
+
+    function formatSkillLabel(name: string): string {
+        const normalized = normalizeSkillName(name) ?? name;
+        return normalized
+            .split(' ')
+            .map((segment) => (segment ? `${segment[0]?.toUpperCase() ?? ''}${segment.slice(1)}` : segment))
+            .join(' ');
+    }
+
+    function addSkillLevel(target: Record<string, number>, skill: string | null | undefined, level: number | null) {
+        const key = normalizeSkillName(skill ?? '');
+        if (!key) return;
+        const numeric = Math.max(0, Math.floor(Number(level ?? 0)));
+        if (!Number.isFinite(numeric)) return;
+        const current = target[key] ?? 0;
+        if (numeric > current) target[key] = numeric;
+    }
+
+    function accumulateRequiredLevels(
+        spec: GameItemCreationSpecs,
+        target: Record<string, number>,
+        visited: Set<string | number>,
+    ) {
+        for (const req of spec.requiredSkills ?? []) {
+            if (!req?.skillName || typeof req.skillLevel !== 'number') continue;
+            addSkillLevel(target, req.skillName, req.skillLevel);
+        }
+
+        for (const ingredient of spec.ingredients ?? []) {
+            if (!ingredient?.item) continue;
+            if (ingredient.consumedDuringCreation === false) continue;
+
+            const childItem = ingredient.item as IOsrsboxItemWithMeta | undefined;
+            const childId = childItem?.id ?? null;
+            if (childId !== null) {
+                if (visited.has(childId)) continue;
+                visited.add(childId);
+            }
+
+            const childSpec = getPrimaryCreationSpec(childItem);
+            if (childSpec) {
+                accumulateRequiredLevels(childSpec, target, visited);
+            }
+
+            if (childId !== null) visited.delete(childId);
+        }
+    }
 </script>
 
 {#if !rows.length}
@@ -112,10 +169,9 @@
                 <span class="text-foreground">
                     {#if row.level}{row.level}
                     {/if}
-                    {row.skillName}
+                    {formatSkillLabel(row.skillName)}
                 </span>
-                <span class="text-muted-foreground">Step: {formatXp(row.stepXp)}</span>
-                <span class="text-primary font-bold">Total: {formatXp(row.totalXp)}</span>
+                <span class="text-primary font-bold">Total XP: {formatXp(row.totalXp)}</span>
             </span>
         {/each}
     </div>

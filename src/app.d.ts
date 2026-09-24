@@ -5,7 +5,10 @@ declare global {
         // interface Error {}
         // interface Locals {}
         // interface PageData {}
-        // interface PageState {}
+        interface PageState {
+            /** Page number of a paginated item list, recorded so back/forward can restore it. */
+            itemsPage?: number;
+        }
         // interface Platform {}
     }
 }

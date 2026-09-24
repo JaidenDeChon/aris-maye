@@ -1,7 +1,10 @@
 <script lang="ts">
     import * as Table from '$lib/components/ui/table';
     import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
+    import { resolveIngredientUnitPrice } from '$lib/helpers/ingredient-price';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
+    import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
+    import { getStoreRoot } from '$lib/stores/character-store.svelte';
     import { untrack } from 'svelte';
     import { resolve } from '$app/paths';
 
@@ -18,26 +21,84 @@
         amount: number;
         unitPrice: number | null;
         totalPrice: number | null;
+        /** Whether this walk expanded the row into the child rows that carry its real cost. */
+        substituted: boolean;
     };
 
     const rootSpec = $derived(creationSpec ?? getPrimaryCreationSpec(gameItem) ?? null);
     const costRows = $derived(buildCostRows(rootSpec));
+    const characterStore = $derived(getStoreRoot());
+    const activeCharacterId = $derived(characterStore?.activeCharacter ?? null);
+
+    $effect(() => {
+        ensureSuppliesForCharacter(activeCharacterId);
+    });
+
+    const bankItems = $derived(getSuppliesForCharacter($bankItemsStore, activeCharacterId));
+    const suppliesOwned = $derived.by(() => {
+        const owned = new Set<string>();
+        for (const entry of bankItems) {
+            const id = entry?.id;
+            const quantity = Math.floor(Number(entry?.quantity ?? 0));
+            if (!Number.isFinite(quantity) || quantity <= 0) continue;
+            if (id === null || id === undefined) continue;
+            owned.add(String(id));
+        }
+        return owned;
+    });
+    const suppliesExpandedOwned = $derived.by(() => {
+        const expanded = new Set<string>();
+        for (const row of costRows) {
+            const itemId = row.item?.id;
+            if (itemId === null || itemId === undefined) continue;
+            const key = String(itemId);
+            if (!suppliesOwned.has(key)) continue;
+            const spec = getPrimaryCreationSpec(row.item);
+            collectIngredientIds(spec, expanded);
+        }
+        return expanded;
+    });
     // Owned map: checked = already have it, so we should exclude its cost
     let ownedMap = $state<Record<string | number, boolean>>({});
 
     $effect(() => {
         const prev = untrack(() => ownedMap);
-        ownedMap = Object.fromEntries(costRows.map((row) => [row.key, prev[row.key] ?? false]));
+        const next = costRows.map((row) => {
+            const existing = prev[row.key];
+            if (existing !== undefined) return [row.key, existing];
+            const itemId = row.item?.id;
+            const supplyKey = itemId === null || itemId === undefined ? null : String(itemId);
+            const defaultOwned = supplyKey
+                ? suppliesOwned.has(supplyKey) || suppliesExpandedOwned.has(supplyKey)
+                : false;
+            return [row.key, defaultOwned];
+        });
+        ownedMap = Object.fromEntries(next);
     });
 
     const allChecked = $derived(Object.values(ownedMap).every(Boolean));
 
-    const selectedTotal = $derived(
-        costRows.reduce((sum, row) => {
-            if (ownedMap[row.key] || row.totalPrice === null) return sum;
-            return sum + row.totalPrice;
-        }, 0),
-    );
+    const selectedTotal = $derived.by(() => {
+        let sum = 0;
+
+        for (const row of costRows) {
+            if (ownedMap[row.key]) continue;
+
+            if (row.totalPrice === null) {
+                // An untradeable ingredient has no price of its own. Skipping it is only
+                // harmless because this walk already expanded it into the child rows that
+                // carry the real outlay. With no such rows — no stored recipe, or a cycle
+                // cut the walk short — the cost genuinely isn't known, and counting the
+                // row as free would report a total, and a profit, that is too good.
+                if (row.substituted) continue;
+                return null;
+            }
+
+            sum += row.totalPrice;
+        }
+
+        return sum;
+    });
 
     const geValue = $derived(normalizeNumber(gameItem?.highPrice ?? gameItem?.lowPrice));
     const storeValue = $derived(normalizeNumber(gameItem?.cost));
@@ -85,28 +146,67 @@
                         ? existing.totalPrice + totalPrice!
                         : (existing.totalPrice ?? totalPrice);
             } else {
-                map.set(key, { key, item, amount, unitPrice, totalPrice });
+                map.set(key, { key, item, amount, unitPrice, totalPrice, substituted: false });
             }
 
             const childId = item.id ?? null;
-            if (childId !== null) {
-                if (visited.has(childId)) continue;
-                visited.add(childId);
-            }
+            if (childId !== null && visited.has(childId)) continue;
 
             const childSpec = getPrimaryCreationSpec(item);
-            if (childSpec) {
-                accumulate(childSpec, amount, map, visited);
-            }
+            const childConsumes = (childSpec?.ingredients ?? []).some(
+                (child) => child?.item && child.consumedDuringCreation !== false,
+            );
+            if (!childSpec || !childConsumes) continue;
 
+            // Only a recipe that actually contributes rows stands in for this one's price.
+            const row = map.get(key);
+            if (row) row.substituted = true;
+
+            if (childId !== null) visited.add(childId);
+            accumulate(childSpec, amount, map, visited);
             if (childId !== null) visited.delete(childId);
         }
     }
 
+    function collectIngredientIds(spec: GameItemCreationSpecs | null, sink: Set<string>, visited = new Set<string>()) {
+        if (!spec) return;
+        for (const ing of spec.ingredients ?? []) {
+            if (!ing?.item) continue;
+            if (ing.consumedDuringCreation === false) continue;
+
+            const item = ing.item as IOsrsboxItemWithMeta;
+            const itemId = item.id;
+            if (itemId === null || itemId === undefined) continue;
+            const key = String(itemId);
+            sink.add(key);
+
+            if (visited.has(key)) continue;
+            visited.add(key);
+            const childSpec = getPrimaryCreationSpec(item);
+            if (childSpec) {
+                collectIngredientIds(childSpec, sink, visited);
+            }
+            visited.delete(key);
+        }
+    }
+
     function resolveUnitPrice(item?: IOsrsboxItemWithMeta | null): number | null {
-        if (!item) return null;
-        const price = item.highPrice ?? item.lowPrice ?? item.cost ?? null;
-        return typeof price === 'number' ? price : null;
+        // `cost` is the base game value, not a market price. For an item with no GE
+        // market (an untradeable intermediate like "Oak seedling (w)", cost 1) it is
+        // not what the player pays, so the price is reported as unknown and the real
+        // outlay shows up on the child rows this walk already expands to.
+        return resolveIngredientUnitPrice(item);
+    }
+
+    /**
+     * A row's display name, or a placeholder when the tree stopped short of loading it.
+     *
+     * The builder caps how much of a recipe it materializes, so a deep or heavily
+     * cross-linked branch can arrive as a bare id. Such a row has no price either, which
+     * already makes the total read as unknown — this just stops the cell rendering blank.
+     */
+    function rowLabel(row: CostRow): string {
+        return row.item?.name ?? 'Unknown item';
     }
 
     function formatNumber(value: number | null | undefined) {
@@ -154,11 +254,15 @@
                     </Table.Cell>
                     <Table.Cell class="font-medium">
                         {#if row.item.id}
-                            <a class="text-primary hover:underline" href={resolve(`/items/${row.item.id}`)}>
-                                {row.item.name}
+                            <a
+                                class="text-primary hover:underline"
+                                href={resolve(`/items/${row.item.id}`)}
+                                data-sveltekit-preload-data="hover"
+                            >
+                                {rowLabel(row)}
                             </a>
                         {:else}
-                            {row.item.name}
+                            {rowLabel(row)}
                         {/if}
                     </Table.Cell>
                     <Table.Cell class="text-end">{formatNumber(row.amount)}</Table.Cell>

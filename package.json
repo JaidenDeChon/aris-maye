@@ -1,5 +1,5 @@
 {
-    "name": "ge-skiller",
+    "name": "aris-maye",
     "private": true,
     "version": "0.0.1",
     "type": "module",
@@ -14,7 +14,18 @@
         "grab-osrsbox-items": "bun run --env-file .env scripts/grab-osrsbox-items.ts",
         "backfill-missing-items": "bun run --env-file .env scripts/backfill-missing-items.ts",
         "populate-item-ingredient-trees": "bun run --env-file .env scripts/populate-ingredients.ts",
-        "update-item-prices": "bun run --env-file .env netlify/functions/update-item-prices.ts",
+        "update-item-prices": "bun run --env-file .env scripts/run-update-item-prices.ts",
+        "remove-duplicate-items": "bun run --env-file .env scripts/remove-duplicate-items.ts",
+        "normalize-wiki-names": "bun run --env-file .env scripts/normalize-wiki-names.ts",
+        "repair-ingredient-links": "bun run --env-file .env scripts/repair-ingredient-links.ts",
+        "populate-store-prices": "bun run --env-file .env scripts/populate-store-prices.ts",
+        "promote-db": "bun run --env-file .env scripts/promote-db.ts",
+        "restore-creation-specs": "bun run --env-file .env scripts/restore-creation-specs.ts",
+        "copy-osrsbox-to-dev": "OSRSBOX_SOURCE_DB=osrsbox OSRSBOX_TARGET_DB=osrsbox-dev bun run --env-file .env scripts/copy-osrsbox-db.ts",
+        "copy-osrsbox-dev-to-prod": "OSRSBOX_SOURCE_DB=osrsbox-dev OSRSBOX_TARGET_DB=osrsbox-prod bun run --env-file .env scripts/copy-osrsbox-db.ts",
+        "update-db": "bun run --env-file .env scripts/update-db.ts",
+        "compute-creation-tree-skills": "bun run --env-file .env scripts/compute-creation-tree-skills.ts",
+        "test": "bun test",
         "format": "prettier --write ."
     },
     "devDependencies": {

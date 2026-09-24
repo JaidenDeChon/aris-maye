@@ -13,6 +13,7 @@
 import mongoose from 'mongoose';
 import * as cheerio from 'cheerio';
 import { OsrsboxItemModel } from '../src/lib/models/mongo-schemas/osrsbox-db-item-schema';
+import { deriveWikiPageIdentity } from '../src/lib/helpers/wiki-page-title';
 
 /**
  * ======================================================================
@@ -48,7 +49,7 @@ const LATEST_PRICES_URL = `${PRICES_BASE}/latest`;
 const OSRS_WIKI_API = 'https://oldschool.runescape.wiki/api.php';
 
 // Be nice to the wiki; use a custom UA
-const USER_AGENT = 'ge-skiller-import/1.0 (contact: your-contact-or-repo-url-here)';
+const USER_AGENT = 'aris-maye-import/1.0 (contact: your-contact-or-repo-url-here)';
 
 /**
  * ======================================================================
@@ -783,7 +784,13 @@ async function main() {
             // 4. Merge latest GE prices
             const finalItem = mergeItemWithPrices(baseItem, latestPrices);
 
-            // 5. Upsert via your osrsboxItemSchema
+            // 5. Record the real wiki page title, so later wiki scrapes don't have to
+            // guess at OSRSBox's synthetic "<page> (<version>)" wiki_name.
+            const { wikiPageTitle, wikiVersion } = deriveWikiPageIdentity(finalItem);
+            finalItem.wiki_page_title = wikiPageTitle;
+            finalItem.wiki_version = wikiVersion;
+
+            // 6. Upsert via your osrsboxItemSchema
             await OsrsboxItemModel.updateOne({ id: finalItem.id }, { $set: finalItem }, { upsert: true });
 
             imported.push(rawName);
