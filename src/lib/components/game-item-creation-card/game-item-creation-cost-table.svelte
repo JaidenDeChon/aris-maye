@@ -1,11 +1,11 @@
 <script lang="ts">
     import * as Table from '$lib/components/ui/table';
     import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
-    import { resolveIngredientUnitPrice } from '$lib/helpers/ingredient-price';
+    import { buildCostRows, totalCost, type CostRow, type CostRowKey } from '$lib/helpers/creation-cost-rows';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { getStoreRoot } from '$lib/stores/character-store.svelte';
-    import { untrack } from 'svelte';
+    import { SvelteSet } from 'svelte/reactivity';
     import { resolve } from '$app/paths';
 
     interface GameItemCreationCostTableProps {
@@ -17,18 +17,7 @@
 
     const { gameItem, creationSpec = null, onTotalChange }: GameItemCreationCostTableProps = $props();
 
-    type CostRow = {
-        key: string | number;
-        item: IOsrsboxItemWithMeta;
-        amount: number;
-        unitPrice: number | null;
-        totalPrice: number | null;
-        /** Whether this walk expanded the row into the child rows that carry its real cost. */
-        substituted: boolean;
-    };
-
     const rootSpec = $derived(creationSpec ?? getPrimaryCreationSpec(gameItem) ?? null);
-    const costRows = $derived(buildCostRows(rootSpec));
     const characterStore = $derived(getStoreRoot());
     const activeCharacterId = $derived(characterStore?.activeCharacter ?? null);
 
@@ -38,7 +27,7 @@
 
     const bankItems = $derived(getSuppliesForCharacter($bankItemsStore, activeCharacterId));
     const suppliesOwned = $derived.by(() => {
-        const owned = new Set<string>();
+        const owned = new SvelteSet<string>();
         for (const entry of bankItems) {
             const id = entry?.id;
             const quantity = Math.floor(Number(entry?.quantity ?? 0));
@@ -48,155 +37,37 @@
         }
         return owned;
     });
-    const suppliesExpandedOwned = $derived.by(() => {
-        const expanded = new Set<string>();
-        for (const row of costRows) {
-            const itemId = row.item?.id;
-            if (itemId === null || itemId === undefined) continue;
-            const key = String(itemId);
-            if (!suppliesOwned.has(key)) continue;
-            const spec = getPrimaryCreationSpec(row.item);
-            collectIngredientIds(spec, expanded);
-        }
-        return expanded;
-    });
-    // Owned map: checked = already have it, so we should exclude its cost
-    let ownedMap = $state<Record<string | number, boolean>>({});
 
-    $effect(() => {
-        const prev = untrack(() => ownedMap);
-        const next = costRows.map((row) => {
-            const existing = prev[row.key];
-            if (existing !== undefined) return [row.key, existing];
-            const itemId = row.item?.id;
-            const supplyKey = itemId === null || itemId === undefined ? null : String(itemId);
-            const defaultOwned = supplyKey
-                ? suppliesOwned.has(supplyKey) || suppliesExpandedOwned.has(supplyKey)
-                : false;
-            return [row.key, defaultOwned];
-        });
-        ownedMap = Object.fromEntries(next);
-    });
+    // Ticks the reader changed by hand. Anything they have not touched follows their supplies.
+    let ownedOverrides = $state<Record<string, boolean>>({});
+    // Priced ingredients the reader chose to make instead of buy.
+    const makeKeys = new SvelteSet<CostRowKey>();
 
-    const allChecked = $derived(Object.values(ownedMap).every(Boolean));
+    function isOwned(key: CostRowKey): boolean {
+        return ownedOverrides[String(key)] ?? suppliesOwned.has(String(key));
+    }
 
-    const selectedTotal = $derived.by(() => {
-        let sum = 0;
-
-        for (const row of costRows) {
-            if (ownedMap[row.key]) continue;
-
-            if (row.totalPrice === null) {
-                // An untradeable ingredient has no price of its own. Skipping it is only
-                // harmless because this walk already expanded it into the child rows that
-                // carry the real outlay. With no such rows — no stored recipe, or a cycle
-                // cut the walk short — the cost genuinely isn't known, and counting the
-                // row as free would report a total, and a profit, that is too good.
-                if (row.substituted) continue;
-                return null;
-            }
-
-            sum += row.totalPrice;
-        }
-
-        return sum;
-    });
+    const costRows = $derived(buildCostRows(rootSpec, { isOwned, makeKeys }));
+    const allChecked = $derived(costRows.every((row) => isOwned(row.key)));
+    const selectedTotal = $derived(totalCost(costRows, isOwned));
 
     $effect(() => {
         onTotalChange?.(costRows.length ? selectedTotal : null);
     });
 
-    function toggleRow(rowKey: string | number) {
-        ownedMap = { ...ownedMap, [rowKey]: !ownedMap[rowKey] };
+    function toggleRow(key: CostRowKey) {
+        ownedOverrides = { ...ownedOverrides, [String(key)]: !isOwned(key) };
     }
 
     function toggleAll(value: boolean) {
-        ownedMap = Object.fromEntries(costRows.map((row) => [row.key, value]));
+        const next = { ...ownedOverrides };
+        for (const row of costRows) next[String(row.key)] = value;
+        ownedOverrides = next;
     }
 
-    function buildCostRows(spec: GameItemCreationSpecs | null): CostRow[] {
-        if (!spec) return [];
-
-        const map = new Map<string | number, CostRow>();
-        accumulate(spec, 1, map, new Set());
-        return Array.from(map.values()).sort((a, b) => (b.totalPrice ?? 0) - (a.totalPrice ?? 0));
-    }
-
-    function accumulate(
-        spec: GameItemCreationSpecs,
-        multiplier: number,
-        map: Map<string | number, CostRow>,
-        visited: Set<string | number>,
-    ) {
-        for (const ing of spec.ingredients ?? []) {
-            if (!ing?.item) continue;
-            if (ing.consumedDuringCreation === false) continue;
-
-            const item = ing.item as IOsrsboxItemWithMeta;
-            const amount = (ing.amount ?? 1) * multiplier;
-            const key = item.id ?? item.name ?? crypto.randomUUID();
-
-            const unitPrice = resolveUnitPrice(item);
-            const totalPrice = unitPrice !== null ? unitPrice * amount : null;
-
-            const existing = map.get(key);
-            if (existing) {
-                existing.amount += amount;
-                existing.totalPrice =
-                    unitPrice !== null && existing.totalPrice !== null
-                        ? existing.totalPrice + totalPrice!
-                        : (existing.totalPrice ?? totalPrice);
-            } else {
-                map.set(key, { key, item, amount, unitPrice, totalPrice, substituted: false });
-            }
-
-            const childId = item.id ?? null;
-            if (childId !== null && visited.has(childId)) continue;
-
-            const childSpec = getPrimaryCreationSpec(item);
-            const childConsumes = (childSpec?.ingredients ?? []).some(
-                (child) => child?.item && child.consumedDuringCreation !== false,
-            );
-            if (!childSpec || !childConsumes) continue;
-
-            // Only a recipe that actually contributes rows stands in for this one's price.
-            const row = map.get(key);
-            if (row) row.substituted = true;
-
-            if (childId !== null) visited.add(childId);
-            accumulate(childSpec, amount, map, visited);
-            if (childId !== null) visited.delete(childId);
-        }
-    }
-
-    function collectIngredientIds(spec: GameItemCreationSpecs | null, sink: Set<string>, visited = new Set<string>()) {
-        if (!spec) return;
-        for (const ing of spec.ingredients ?? []) {
-            if (!ing?.item) continue;
-            if (ing.consumedDuringCreation === false) continue;
-
-            const item = ing.item as IOsrsboxItemWithMeta;
-            const itemId = item.id;
-            if (itemId === null || itemId === undefined) continue;
-            const key = String(itemId);
-            sink.add(key);
-
-            if (visited.has(key)) continue;
-            visited.add(key);
-            const childSpec = getPrimaryCreationSpec(item);
-            if (childSpec) {
-                collectIngredientIds(childSpec, sink, visited);
-            }
-            visited.delete(key);
-        }
-    }
-
-    function resolveUnitPrice(item?: IOsrsboxItemWithMeta | null): number | null {
-        // `cost` is the base game value, not a market price. For an item with no GE
-        // market (an untradeable intermediate like "Oak seedling (w)", cost 1) it is
-        // not what the player pays, so the price is reported as unknown and the real
-        // outlay shows up on the child rows this walk already expands to.
-        return resolveIngredientUnitPrice(item);
+    function setMade(key: CostRowKey, made: boolean) {
+        if (made) makeKeys.add(key);
+        else makeKeys.delete(key);
     }
 
     /**
@@ -252,7 +123,7 @@
                 </Table.Header>
                 <Table.Body>
                     {#each costRows as row (row.key)}
-                        {@const owned = ownedMap[row.key]}
+                        {@const owned = isOwned(row.key)}
                         <Table.Row class={owned ? 'bg-muted/40' : ''}>
                             <Table.Cell class="px-2 sm:px-4 w-10 sm:w-20">
                                 <input
@@ -263,7 +134,11 @@
                                 />
                             </Table.Cell>
                             <Table.Cell class="px-2 sm:px-4 font-medium">
-                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <!-- Indented under the ingredient it is made into, so a made item reads as a group. -->
+                                <div
+                                    class="flex flex-wrap items-center gap-x-2 gap-y-1"
+                                    style:padding-left={row.depth ? `${row.depth}rem` : undefined}
+                                >
                                     {#if row.item.id}
                                         <a
                                             class="text-primary hover:underline {owned ? 'opacity-60' : ''}"
@@ -275,12 +150,34 @@
                                     {:else}
                                         <span class={owned ? 'opacity-60' : ''}>{rowLabel(row)}</span>
                                     {/if}
-                                    {#if row.substituted}
+                                    {#if row.mustMake && !owned}
                                         <span
                                             class="whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.65rem] font-medium text-muted-foreground"
                                         >
-                                            Can be made
+                                            Made
                                         </span>
+                                    {:else if row.makeable && !owned}
+                                        <!-- Buying it and making it are the two ways to get it; counting both
+                                             would pay for it twice. -->
+                                        <div
+                                            class="inline-flex rounded-full border p-0.5 text-[0.65rem] font-medium"
+                                            role="group"
+                                            aria-label={`Buy or make ${rowLabel(row)}`}
+                                        >
+                                            {#each [false, true] as makeIt (makeIt)}
+                                                <button
+                                                    type="button"
+                                                    class="rounded-full px-2 py-0.5 transition-colors {row.made ===
+                                                    makeIt
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'text-muted-foreground hover:text-foreground'}"
+                                                    aria-pressed={row.made === makeIt}
+                                                    onclick={() => setMade(row.key, makeIt)}
+                                                >
+                                                    {makeIt ? 'Make' : 'Buy'}
+                                                </button>
+                                            {/each}
+                                        </div>
                                     {/if}
                                 </div>
                             </Table.Cell>
@@ -299,6 +196,8 @@
                             <Table.Cell class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap">
                                 {#if owned}
                                     <span class="text-muted-foreground">Have it</span>
+                                {:else if row.made}
+                                    <span class="text-muted-foreground">Made</span>
                                 {:else if row.totalPrice === null}
                                     <span class="text-muted-foreground">—</span>
                                 {:else}
