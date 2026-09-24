@@ -11,9 +11,11 @@
     interface GameItemCreationCostTableProps {
         gameItem: IOsrsboxItemWithMeta | null;
         creationSpec?: GameItemCreationSpecs | null;
+        /** Told the cost of what the reader has not ticked as owned, or null when it can't be priced. */
+        onTotalChange?: (total: number | null) => void;
     }
 
-    const { gameItem, creationSpec = null }: GameItemCreationCostTableProps = $props();
+    const { gameItem, creationSpec = null, onTotalChange }: GameItemCreationCostTableProps = $props();
 
     type CostRow = {
         key: string | number;
@@ -100,10 +102,9 @@
         return sum;
     });
 
-    const geValue = $derived(normalizeNumber(gameItem?.highPrice ?? gameItem?.lowPrice));
-    const storeValue = $derived(normalizeNumber(gameItem?.cost));
-    const highAlchValue = $derived(normalizeNumber(gameItem?.highalch));
-    const lowAlchValue = $derived(normalizeNumber(gameItem?.lowalch));
+    $effect(() => {
+        onTotalChange?.(costRows.length ? selectedTotal : null);
+    });
 
     function toggleRow(rowKey: string | number) {
         ownedMap = { ...ownedMap, [rowKey]: !ownedMap[rowKey] };
@@ -214,117 +215,120 @@
         return Math.round(value).toLocaleString();
     }
 
-    function normalizeNumber(value: number | null | undefined): number | null {
-        return typeof value === 'number' ? value : null;
-    }
-
-    function formatDelta(value: number | null, baseline: number | null): string {
-        if (value === null || baseline === null) return '—';
-        const delta = value - baseline;
-        const sign = delta > 0 ? '+' : '';
-        return `${sign}${Math.round(delta).toLocaleString()} gp`;
+    function formatGp(value: number | null | undefined) {
+        if (value === null || value === undefined) return '—';
+        return `${formatNumber(value)} gp`;
     }
 </script>
 
-{#if !costRows.length}
-    <p class="text-sm text-muted-foreground p-3">No cost data available.</p>
-{:else}
-    <Table.Root>
-        <Table.Header>
-            <Table.Row>
-                <Table.Head class="w-16">
-                    <input
-                        type="checkbox"
-                        aria-label="Mark all ingredients as already owned"
-                        checked={allChecked}
-                        onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
-                    />
-                </Table.Head>
-                <Table.Head>Item (owned?)</Table.Head>
-                <Table.Head class="text-end">Qty</Table.Head>
-                <Table.Head class="text-end">Unit (GE)</Table.Head>
-                <Table.Head class="text-end">Total</Table.Head>
-            </Table.Row>
-        </Table.Header>
-        <Table.Body>
-            {#each costRows as row (row.key)}
-                <Table.Row>
-                    <Table.Cell class="w-16">
-                        <input type="checkbox" checked={ownedMap[row.key]} onchange={() => toggleRow(row.key)} />
-                    </Table.Cell>
-                    <Table.Cell class="font-medium">
-                        {#if row.item.id}
-                            <a
-                                class="text-primary hover:underline"
-                                href={resolve(`/items/${row.item.id}`)}
-                                data-sveltekit-preload-data="hover"
+<section class="flex flex-col gap-2">
+    <div>
+        <h4 class="text-sm font-semibold">Ingredients and cost</h4>
+    </div>
+
+    {#if !costRows.length}
+        <p class="text-sm text-muted-foreground">No cost data available.</p>
+    {:else}
+        <div class="border rounded-md overflow-hidden">
+            <Table.Root class="text-xs sm:text-sm">
+                <Table.Header>
+                    <Table.Row>
+                        <Table.Head class="px-2 sm:px-4 w-10 sm:w-20">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    aria-label="Mark every ingredient as one you already have"
+                                    checked={allChecked}
+                                    onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
+                                />
+                                <span class="text-xs sr-only sm:not-sr-only">Have</span>
+                            </label>
+                        </Table.Head>
+                        <Table.Head class="px-2 sm:px-4">Item</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end">Qty</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end hidden sm:table-cell">Each</Table.Head>
+                        <Table.Head class="px-2 sm:px-4 text-end">Cost</Table.Head>
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {#each costRows as row (row.key)}
+                        {@const owned = ownedMap[row.key]}
+                        <Table.Row class={owned ? 'bg-muted/40' : ''}>
+                            <Table.Cell class="px-2 sm:px-4 w-10 sm:w-20">
+                                <input
+                                    type="checkbox"
+                                    aria-label={`I already have ${rowLabel(row)}`}
+                                    checked={owned}
+                                    onchange={() => toggleRow(row.key)}
+                                />
+                            </Table.Cell>
+                            <Table.Cell class="px-2 sm:px-4 font-medium">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    {#if row.item.id}
+                                        <a
+                                            class="text-primary hover:underline {owned ? 'opacity-60' : ''}"
+                                            href={resolve(`/items/${row.item.id}`)}
+                                            data-sveltekit-preload-data="hover"
+                                        >
+                                            {rowLabel(row)}
+                                        </a>
+                                    {:else}
+                                        <span class={owned ? 'opacity-60' : ''}>{rowLabel(row)}</span>
+                                    {/if}
+                                    {#if row.substituted}
+                                        <span
+                                            class="whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.65rem] font-medium text-muted-foreground"
+                                        >
+                                            Can be made
+                                        </span>
+                                    {/if}
+                                </div>
+                            </Table.Cell>
+                            <Table.Cell class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap"
+                                >{formatNumber(row.amount)}</Table.Cell
                             >
-                                {rowLabel(row)}
-                            </a>
-                        {:else}
-                            {rowLabel(row)}
-                        {/if}
-                    </Table.Cell>
-                    <Table.Cell class="text-end">{formatNumber(row.amount)}</Table.Cell>
-                    <Table.Cell class="text-end">{formatNumber(row.unitPrice)}</Table.Cell>
-                    <Table.Cell class="text-end">{formatNumber(ownedMap[row.key] ? 0 : row.totalPrice)}</Table.Cell>
-                </Table.Row>
-            {/each}
-            <Table.Row>
-                <Table.Cell colspan={2} class="font-semibold">
-                    <div class="inline-flex items-center gap-2">
-                        <span class="inline-block h-5 w-5"></span>
-                    </div>
-                </Table.Cell>
-                <Table.Cell class="text-end font-semibold" colspan={3}>{formatNumber(selectedTotal)}</Table.Cell>
-            </Table.Row>
-            <Table.Row>
-                <Table.Cell colspan={2} class="font-semibold">
-                    <div class="inline-flex items-center gap-2">
-                        <img src="/other-images/grand-exchange.png" alt="Grand Exchange" class="h-5 w-5 drop-shadow" />
-                        Profit vs GE (high)
-                    </div>
-                </Table.Cell>
-                <Table.Cell class="text-end font-semibold" colspan={3}>{formatDelta(geValue, selectedTotal)}</Table.Cell
-                >
-            </Table.Row>
-            <Table.Row>
-                <Table.Cell colspan={2} class="font-semibold">
-                    <div class="inline-flex items-center gap-2">
-                        <img src="/other-images/pot.png" alt="General store" class="h-5 w-5 drop-shadow" />
-                        Profit vs store
-                    </div>
-                </Table.Cell>
-                <Table.Cell class="text-end font-semibold" colspan={3}
-                    >{formatDelta(storeValue, selectedTotal)}</Table.Cell
-                >
-            </Table.Row>
-            <Table.Row>
-                <Table.Cell colspan={2} class="font-semibold">
-                    <div class="inline-flex items-center gap-2">
-                        <img
-                            src="/spell-images/high-level-alchemy.png"
-                            alt="High alchemy"
-                            class="h-5 w-5 drop-shadow"
-                        />
-                        Profit vs high alch
-                    </div>
-                </Table.Cell>
-                <Table.Cell class="text-end font-semibold" colspan={3}
-                    >{formatDelta(highAlchValue, selectedTotal)}</Table.Cell
-                >
-            </Table.Row>
-            <Table.Row>
-                <Table.Cell colspan={2} class="font-semibold">
-                    <div class="inline-flex items-center gap-2">
-                        <img src="/spell-images/low-level-alchemy.png" alt="Low alchemy" class="h-5 w-5 drop-shadow" />
-                        Profit vs low alch
-                    </div>
-                </Table.Cell>
-                <Table.Cell class="text-end font-semibold" colspan={3}
-                    >{formatDelta(lowAlchValue, selectedTotal)}</Table.Cell
-                >
-            </Table.Row>
-        </Table.Body>
-    </Table.Root>
-{/if}
+                            <Table.Cell
+                                class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap hidden sm:table-cell"
+                            >
+                                {#if row.unitPrice === null}
+                                    <span class="text-muted-foreground">No price</span>
+                                {:else}
+                                    {formatGp(row.unitPrice)}
+                                {/if}
+                            </Table.Cell>
+                            <Table.Cell class="px-2 sm:px-4 text-end tabular-nums whitespace-nowrap">
+                                {#if owned}
+                                    <span class="text-muted-foreground">Have it</span>
+                                {:else if row.totalPrice === null}
+                                    <span class="text-muted-foreground">—</span>
+                                {:else}
+                                    {formatGp(row.totalPrice)}
+                                {/if}
+                                <!-- Phones have no room for the "Each" column, so the unit price rides
+                                     under the cost instead. -->
+                                <span class="block whitespace-normal text-xs text-muted-foreground sm:hidden">
+                                    {row.unitPrice === null ? 'No price' : `${formatGp(row.unitPrice)} each`}
+                                </span>
+                            </Table.Cell>
+                        </Table.Row>
+                    {/each}
+                </Table.Body>
+                <Table.Footer>
+                    <Table.Row>
+                        <Table.Cell colspan={2} class="px-2 sm:px-4 font-semibold">Total cost</Table.Cell>
+                        <Table.Cell class="hidden sm:table-cell"></Table.Cell>
+                        <Table.Cell></Table.Cell>
+                        <Table.Cell class="px-2 sm:px-4 text-end font-semibold tabular-nums whitespace-nowrap">
+                            {selectedTotal === null ? 'Unknown' : formatGp(selectedTotal)}
+                        </Table.Cell>
+                    </Table.Row>
+                </Table.Footer>
+            </Table.Root>
+        </div>
+        {#if selectedTotal === null}
+            <p class="text-xs text-muted-foreground">
+                Some ingredients have no price we can use, so the total and the profit can't be worked out.
+            </p>
+        {/if}
+    {/if}
+</section>

@@ -4,6 +4,7 @@
     import GameItemTree from '$lib/components/game-item-creation-card/game-item-tree.svelte';
     import GameItemCreationXpTags from '$lib/components/game-item-creation-card/game-item-creation-xp-tags.svelte';
     import GameItemCreationCostTable from '$lib/components/game-item-creation-card/game-item-creation-cost-table.svelte';
+    import GameItemCreationProfit from '$lib/components/game-item-creation-card/game-item-creation-profit.svelte';
     import * as Tabs from '$lib/components/ui/tabs';
     import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
@@ -27,11 +28,13 @@
     const specOptions = $derived(
         creationSpecs.map((spec, index) => ({
             id: `spec-${index}`,
-            label: creationSpecs.length === 1 ? 'Spec 1' : `Spec ${index + 1}`,
+            label: `Recipe ${index + 1}`,
             spec,
         })),
     );
     let selectedSpecId = $state('');
+    // Each recipe's ingredient cost, reported by its cost table so the profit tiles can use it.
+    let totalCosts = $state<Record<string, number | null>>({});
     const selectedSpec = $derived(specOptions.find((opt) => opt.id === selectedSpecId)?.spec ?? creationSpec ?? null);
 
     $effect(() => {
@@ -52,38 +55,46 @@
     {:else}
         <!-- Header -->
         <Card.Header>
-            <Card.Title class="text-xl">Item creation stats</Card.Title>
-            <Card.Description>
-                {hasIngredients
-                    ? 'XP and GP you stand to gain when creating this item'
-                    : 'This item has no ingredients.'}
-                {#if refreshing}
-                    <span class="text-muted-foreground/80">· Updating…</span>
-                {/if}
-            </Card.Description>
+            <Card.Title class="text-xl">Recipe tree</Card.Title>
+            {#if refreshing}
+                <Card.Description>Updating…</Card.Description>
+            {/if}
         </Card.Header>
 
         <!-- Body -->
         {#if hasIngredients}
             <Tabs.Root value={selectedSpecId} onValueChange={(val) => (selectedSpecId = val)}>
-                <div class="px-5 mt-4">
-                    <Tabs.List class="flex gap-2 flex-wrap w-fit">
-                        {#each specOptions as option (option.id)}
-                            <Tabs.Trigger value={option.id}>{option.label}</Tabs.Trigger>
-                        {/each}
-                    </Tabs.List>
-                </div>
+                <!-- A tab strip with one tab in it is a control with nothing to choose. -->
+                {#if specOptions.length > 1}
+                    <div class="px-3 sm:px-5 mt-2 flex flex-wrap items-center gap-3">
+                        <Tabs.List class="flex gap-2 flex-wrap w-fit">
+                            {#each specOptions as option (option.id)}
+                                <Tabs.Trigger value={option.id}>{option.label}</Tabs.Trigger>
+                            {/each}
+                        </Tabs.List>
+                        <p class="text-xs text-muted-foreground">
+                            There are {specOptions.length} ways to make this item.
+                        </p>
+                    </div>
+                {/if}
 
                 {#each specOptions as option (option.id)}
-                    <Tabs.Content value={option.id} class="px-5">
-                        <div class="grid gap-4 xl:grid-cols-2">
+                    <Tabs.Content value={option.id} class="px-3 sm:px-5 pb-1">
+                        <div class="flex flex-col gap-6 pt-2">
                             <div class="border rounded-md bg-muted/40 p-3">
                                 <GameItemTree {gameItem} creationSpec={option.spec} />
                             </div>
-                            <div class="border rounded-lg bg-card shadow-sm overflow-hidden">
-                                <div class="space-y-4 max-h-[28rem] overflow-auto">
+                            <div
+                                class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start"
+                            >
+                                <GameItemCreationCostTable
+                                    {gameItem}
+                                    creationSpec={option.spec}
+                                    onTotalChange={(total) => (totalCosts[option.id] = total)}
+                                />
+                                <div class="flex flex-col gap-6">
                                     <GameItemCreationXpTags {gameItem} creationSpec={option.spec} />
-                                    <GameItemCreationCostTable {gameItem} creationSpec={option.spec} />
+                                    <GameItemCreationProfit {gameItem} totalCost={totalCosts[option.id] ?? null} />
                                 </div>
                             </div>
                         </div>
