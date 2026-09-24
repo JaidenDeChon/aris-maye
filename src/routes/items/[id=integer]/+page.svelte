@@ -95,17 +95,18 @@
         if (high === null || low === null) return null;
         return high - low;
     });
+    // Buying an item to alch it also burns a nature rune, so the rune comes off the profit.
     const highAlchProfit = $derived(() => {
-        const alch = gameItem?.highalch;
+        const afterRune = alchemyValueAfterRune(gameItem?.highalch, natureRunePrice);
         const price = normalizePrice(gameItem?.highPrice);
-        if (alch === null || alch === undefined || price === null) return null;
-        return alch - price;
+        if (afterRune === null || price === null) return null;
+        return afterRune - price;
     });
     const lowAlchProfit = $derived(() => {
-        const alch = gameItem?.lowalch;
+        const afterRune = alchemyValueAfterRune(gameItem?.lowalch, natureRunePrice);
         const price = normalizePrice(gameItem?.lowPrice);
-        if (alch === null || alch === undefined || price === null) return null;
-        return alch - price;
+        if (afterRune === null || price === null) return null;
+        return afterRune - price;
     });
 
     // Which prices apply to the reader. Everything below branches on this one boolean rather than on
@@ -661,6 +662,7 @@
             <p class="text-sm text-rose-500 mt-4">Failed to load ingredient data.</p>
         {/if}
         <GameItemTreeCard
+            {natureRunePrice}
             rootClass="mt-4 pb-5"
             gameItem={treeItem}
             loading={treeLoading}
@@ -780,7 +782,7 @@
     {#if usesGrandExchange}
         {#if buyPrice !== null && profit !== null}
             <p class="text-xs text-muted-foreground">
-                Profit if you buy one at {formatValue(buyPrice)}:
+                Profit after buying one at {formatValue(buyPrice)} and a nature rune:
                 <span class="font-medium {profitTone(profit)}">{formatDelta(profit)}</span>
             </p>
         {/if}

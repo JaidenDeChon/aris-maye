@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { NATURE_RUNE_FALLBACK_PRICE, alchemyValueAfterRune } from '$lib/constants/alchemy';
     import StatTile from '$lib/components/global/stat-tile.svelte';
     import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 
@@ -6,14 +7,16 @@
         gameItem: IOsrsboxItemWithMeta | null;
         /** What the ingredients cost, as totalled by the cost table next to this. */
         totalCost: number | null;
+        /** What a nature rune costs. Every alch burns one, so it comes off the alch profits. */
+        natureRunePrice?: number;
     }
 
-    const { gameItem, totalCost }: GameItemCreationProfitProps = $props();
+    const { gameItem, totalCost, natureRunePrice = NATURE_RUNE_FALLBACK_PRICE }: GameItemCreationProfitProps = $props();
 
     const geValue = $derived(normalizeNumber(gameItem?.highPrice ?? gameItem?.lowPrice));
     const storeValue = $derived(normalizeNumber(gameItem?.cost));
-    const highAlchValue = $derived(normalizeNumber(gameItem?.highalch));
-    const lowAlchValue = $derived(normalizeNumber(gameItem?.lowalch));
+    const highAlchValue = $derived(alchemyValueAfterRune(gameItem?.highalch, natureRunePrice));
+    const lowAlchValue = $derived(alchemyValueAfterRune(gameItem?.lowalch, natureRunePrice));
 
     const options = $derived([
         {
@@ -29,13 +32,13 @@
         {
             label: 'High alch',
             value: highAlchValue,
-            hint: highAlchValue === null ? undefined : 'Not including nature runes',
+            hint: highAlchValue === null ? undefined : 'Including nature runes',
             icon: '/spell-images/high-level-alchemy.png',
         },
         {
             label: 'Low alch',
             value: lowAlchValue,
-            hint: lowAlchValue === null ? undefined : 'Not including nature runes',
+            hint: lowAlchValue === null ? undefined : 'Including nature runes',
             icon: '/spell-images/low-level-alchemy.png',
         },
     ]);

@@ -5,6 +5,7 @@
     import GameItemCreationXpTags from '$lib/components/game-item-creation-card/game-item-creation-xp-tags.svelte';
     import GameItemCreationCostTable from '$lib/components/game-item-creation-card/game-item-creation-cost-table.svelte';
     import GameItemCreationProfit from '$lib/components/game-item-creation-card/game-item-creation-profit.svelte';
+    import { NATURE_RUNE_FALLBACK_PRICE } from '$lib/constants/alchemy';
     import * as Tabs from '$lib/components/ui/tabs';
     import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
@@ -13,6 +14,8 @@
         gameItem: IOsrsboxItemWithMeta | null;
         loading: boolean;
         renderChart: boolean;
+        /** What a nature rune costs, for the alch profits. */
+        natureRunePrice?: number;
         /**
          * A newer item's tree is on its way while the previous one is still rendered. The card
          * stays as it is — swapping it for skeletons would destroy the chart and lose the
@@ -22,7 +25,14 @@
         rootClass?: string;
     }
 
-    const { gameItem, loading, renderChart, refreshing = false, rootClass = '' }: GameItemTreeCardProps = $props();
+    const {
+        gameItem,
+        loading,
+        renderChart,
+        natureRunePrice = NATURE_RUNE_FALLBACK_PRICE,
+        refreshing = false,
+        rootClass = '',
+    }: GameItemTreeCardProps = $props();
     const creationSpec = $derived(getPrimaryCreationSpec(gameItem));
     const creationSpecs = $derived((gameItem?.creationSpecs ?? []) as GameItemCreationSpecs[]);
     const specOptions = $derived(
@@ -94,7 +104,11 @@
                                 />
                                 <div class="flex flex-col gap-6">
                                     <GameItemCreationXpTags {gameItem} creationSpec={option.spec} />
-                                    <GameItemCreationProfit {gameItem} totalCost={totalCosts[option.id] ?? null} />
+                                    <GameItemCreationProfit
+                                        {gameItem}
+                                        {natureRunePrice}
+                                        totalCost={totalCosts[option.id] ?? null}
+                                    />
                                 </div>
                             </div>
                         </div>
