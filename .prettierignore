@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Vendored skill, kept byte for byte with upstream
+/.claude/skills/humanizer/
