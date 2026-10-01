@@ -6,14 +6,14 @@ view, so the homepage works as a front door to the browse page.
 
 ## Decisions
 
-| Question            | Decision                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| Personalization     | Global by default. With an active character profile, modules filter to that profile and say so.     |
+| Question            | Decision                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Personalization     | Global by default. With an active character profile, modules filter to that profile and say so.             |
 | "Signed in"         | An active character profile in localStorage. There are no accounts, so personal parts render on the client. |
-| Volume and movement | Stored by the hourly `update-item-prices` job. The homepage only ever reads Mongo.                   |
-| Layout              | Desktop: a stat strip, then editorial bands. Mobile: the same bands collapsed into one tabbed card.  |
-| GE tax              | Fixed everywhere, in the shared profit pipeline.                                                     |
-| Delivery            | Three staged PRs (below).                                                                            |
+| Volume and movement | Stored by the hourly `update-item-prices` job. The homepage only ever reads Mongo.                          |
+| Layout              | Desktop: a stat strip, then editorial bands. Mobile: the same bands collapsed into one tabbed card.         |
+| GE tax              | Fixed everywhere, in the shared profit pipeline.                                                            |
+| Delivery            | Three staged PRs (below).                                                                                   |
 
 ## Page structure
 
@@ -40,12 +40,12 @@ under 24 hours old.
 
 ### 1. Stat strip
 
-| Tile              | Value                                          |
-| ----------------- | ---------------------------------------------- |
-| Best profit       | max `creationProfit`, with the item name       |
-| Best ROI          | max `creationRoi`                              |
-| Best GP per limit | max `creationProfit × buyLimit`                |
-| Most traded       | max `volume1h` (PR 2)                          |
+| Tile              | Value                                                  |
+| ----------------- | ------------------------------------------------------ |
+| Best profit       | max `creationProfit`, with the item name               |
+| Best ROI          | max `creationRoi`                                      |
+| Best GP per limit | max `creationProfit × buyLimit`                        |
+| Most traded       | max `volume1h` (PR 2)                                  |
 | Biggest mover     | max \|`priceChange24h`\| above the volume floor (PR 2) |
 
 ### 3. Make right now
@@ -65,7 +65,42 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 
 - **Most traded:** `volume1h` (high + low volume), with the GP value traded shown as a secondary number.
 - **Risers / fallers:** `priceChange24h = (mid − mid24hAgo) / mid24hAgo`, where `mid` is the mean of
-  `highPrice` and `lowPrice`. Only items with `volume24h ≥ 500` and a `mid` of at least 100 gp count.
+  `highPrice` and `lowPrice`. Only items that pass the movers floor below count.
+
+#### Movers floor
+
+> **Tunable.** These numbers are starting guesses. Revisit them once PR 2 has collected a day of
+> real volume data. They live as named constants (`MOVERS_MIN_GP_PER_DAY`, `MOVERS_MIN_TRADES_PER_DAY`)
+> so changing them is a one-line edit.
+
+An item counts as a mover only when both of these hold:
+
+- **GP traded per day ≥ 10,000,000**, where GP traded is `volume24h × mid`.
+- **Trades per day ≥ 10**, i.e. `volume24h`.
+
+**Why a floor at all.** Rarely traded items swing wildly. If a niche item sells 3 times a day and
+one player dumps it 60% under the usual price, it would top the fallers list. That's one impatient
+seller, not a market move.
+
+**Why GP traded instead of a fixed trade count.** A fixed count, such as 500 trades a day, favors cheap
+items. Feathers pass easily, but a Twisted bow trading 10–30 times a day never would, even though a
+5% move on a 1.5B item is real news. Measuring gold traded scales the bar with price:
+
+| Item price | Trades/day needed for 10M gp     |
+| ---------- | -------------------------------- |
+| 5 gp       | 2,000,000                        |
+| 1,000 gp   | 10,000                           |
+| 1M gp      | 10                               |
+| 1.5B gp    | 1 (the 10-trade minimum applies) |
+
+The 10-trade minimum stops a single sale of an expensive item from counting.
+
+**What to look at when tuning.**
+
+- If the lists are full of the same few high-volume staples, the GP floor is too high, or the list
+  needs a cap per category.
+- If odd, illiquid items still show up with huge swings, raise the trade minimum.
+- If expensive items never appear, lower the GP floor.
 
 ### 6. Alch & cheap XP
 
@@ -116,10 +151,15 @@ and the item page's profit breakdown so they show the tax as its own row.
 The hourly job also fetches `/api/v1/osrs/1h` (one bulk request) and writes to each item:
 
 ```ts
-volume1h: number;                                  // highPriceVolume + lowPriceVolume
-volumeHistory: { t: number; v: number; mid: number | null }[]; // $push with $slice: -24
-volume24h: number;                                 // sum of volumeHistory.v
-priceChange24h: number | null;                     // from volumeHistory[0].mid
+volume1h: number; // highPriceVolume + lowPriceVolume
+volumeHistory: {
+    t: number;
+    v: number;
+    mid: number | null;
+}
+[]; // $push with $slice: -24
+volume24h: number; // sum of volumeHistory.v
+priceChange24h: number | null; // from volumeHistory[0].mid
 ```
 
 Add an index on `{ tradeable_on_ge: 1, volume1h: -1 }`. The Market pulse band stays hidden until the
@@ -143,6 +183,6 @@ querying live.
 
 ## Open questions
 
-- Is the 500-trades-per-day floor for movers right, or should it scale with price?
+- Tune the [movers floor](#movers-floor) once real volume data is in.
 - This session has no Mongo credentials, so thresholds and copy need a pass against real data once
   PR 1 runs on a deploy preview.
