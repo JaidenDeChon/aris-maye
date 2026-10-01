@@ -1,5 +1,10 @@
+import type { HomepageSnapshot } from '$lib/models/homepage';
+import { getHomepageSnapshot } from '$lib/services/homepage-service.server';
+
 interface HomepageData {
     imageUrl?: string;
+    /** The global sections, valued for a main. Null when they couldn't be loaded. */
+    snapshot: HomepageSnapshot | null;
 }
 
 const npcImages: string[] = [
@@ -42,7 +47,18 @@ async function assembleHomepageData(): Promise<HomepageData['imageUrl']> {
     }
 }
 
+async function loadSnapshot(): Promise<HomepageSnapshot | null> {
+    try {
+        return await getHomepageSnapshot(false);
+    } catch (error) {
+        // The hero and FAQ still work without the data sections, so a failure here shouldn't take
+        // the whole homepage down.
+        console.error('Failed to load homepage snapshot:', error);
+        return null;
+    }
+}
+
 export async function load(): Promise<HomepageData> {
-    const imageUrl = await assembleHomepageData();
-    return { imageUrl };
+    const [imageUrl, snapshot] = await Promise.all([assembleHomepageData(), loadSnapshot()]);
+    return { imageUrl, snapshot };
 }
