@@ -137,18 +137,24 @@ These modules read `character-store` and `bank-items-store` and call the existin
 
 ### 7. Ironman corner (PR 3)
 
-These use the pipeline's Ironman mode (`ironmanExitValue`) and `storePrices`.
+Built for every visitor and cached in both snapshots. Mains find it at the end of the page; an Ironman
+profile sees it first, and on phones as the first tab.
 
-- **Best shop sales:** items whose best `storePrices.firstPrice` beats `highalch`, with
-  `salesToFloor` shown as "sell N before the price bottoms out".
-- **Craft-to-alch profit:** `creationProfit` in Ironman mode, i.e. product alch value minus the
-  value of the ingredients.
-- **Cheapest Ironman XP:** the same as Cheapest XP, but valued in alch value lost per XP.
-- **Shop-supplied crafts:** creations where every leaf ingredient can be bought from an NPC shop
-  (`storePrices.buyPrice` with `stock > 0`) or crafted from such inputs. Ranked by exit value minus
-  the shop cost. This is the closest workable version of "self-sufficient": the dataset can't yet
-  tell gatherable resources from drop-only ones (see `ironman-feature-recommendations.md`), so
-  gathered inputs aren't counted until source data exists.
+- **Sell to shops:** items whose best coin-shop `storePrices.firstPrice` beats their alch value after a
+  nature rune, ranked by the gain, one shop per item. Shows the shop, the alch value, and how many sales
+  until the price bottoms out (`salesToFloor`, `floorPrice`). Shops paying in Tokkul and the like are
+  left out.
+- **Make from shop stock:** creations whose every direct ingredient a coin shop sells
+  (`storePrices.buyPrice > 0`, stock not 0), priced at the cheapest such shop, with coins at face value.
+  Profit is the result's alch value after a nature rune, less those costs. This is the workable version
+  of "self-sufficient": the dataset can't tell gatherable resources from drop-only ones (see
+  `ironman-feature-recommendations.md`). It also only knows shops that buy from players, since that's
+  what `populate-store-prices` scrapes, so a few sell-only shops are missed.
+- **Craft to alch:** the Ironman profit pipeline's top creations (alch value on both sides).
+- **Cheapest Ironman XP:** Cheapest XP, valued in alch value lost per XP.
+
+An Ironman profile skips the last two here, because the page's main sections already show them valued
+the Ironman way.
 
 ## GE tax
 

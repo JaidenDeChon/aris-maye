@@ -7,6 +7,7 @@
     import SkillEarnersSection from './skill-earners-section.svelte';
     import AlchXpSection from './alch-xp-section.svelte';
     import MarketPulseSection from './market-pulse-section.svelte';
+    import IronmanCornerSection from './ironman-corner-section.svelte';
     import HomeSectionsSkeleton from './home-sections-skeleton.svelte';
     import { activeIsIronman } from '$lib/stores/character-store.svelte';
     import { timeSince } from '$lib/helpers/time-since';
@@ -60,13 +61,22 @@
     // Snapshots cached before Market pulse existed have no `marketPulse` at all.
     const pulse = $derived(snapshot?.marketPulse ?? null);
 
+    // Snapshots cached before the Ironman corner existed don't have one.
+    const corner = $derived(snapshot?.ironmanCorner ?? null);
+    // An Ironman sees their corner first; everyone else finds it at the end.
+    const cornerFirst = $derived(Boolean(snapshot?.ironman));
+
     const tabs = $derived([
+        ...(corner && cornerFirst ? [{ value: 'ironman', label: 'Ironman' }] : []),
         { value: 'make', label: 'Make' },
         { value: 'skills', label: 'By skill' },
         ...(pulse ? [{ value: 'market', label: 'Market' }] : []),
         { value: 'xp', label: snapshot && !snapshot.ironman && snapshot.alchPicks.length ? 'Alch & XP' : 'XP' },
+        ...(corner && !cornerFirst ? [{ value: 'ironman', label: 'Ironman' }] : []),
     ]);
-    let activeTab = $state('make');
+    // Until a tab is picked, the first one shows, which follows the account type.
+    let pickedTab = $state<string | null>(null);
+    const activeTab = $derived(pickedTab && tabs.some((tab) => tab.value === pickedTab) ? pickedTab : tabs[0].value);
 
     // Worked out in the browser so the server's clock and time zone never leak into the page.
     const updatedAgo = $derived(mounted && snapshot ? timeSince(Math.floor(snapshot.computedAt / 1000)) : null);
@@ -91,17 +101,23 @@
     {#if snapshot}
         <!-- Wide screens: one band per section. -->
         <div class="hidden flex-col gap-14 md:flex">
+            {#if corner && cornerFirst}
+                <IronmanCornerSection {corner} ironman />
+            {/if}
             <MakeNowSection {snapshot} />
             <SkillEarnersSection {snapshot} />
             {#if pulse}
                 <MarketPulseSection {pulse} />
             {/if}
             <AlchXpSection {snapshot} />
+            {#if corner && !cornerFirst}
+                <IronmanCornerSection {corner} />
+            {/if}
         </div>
 
         <!-- Phones: the same sections as tabs. -->
         <div class="md:hidden">
-            <Tabs.Root bind:value={activeTab} class="flex flex-col gap-4">
+            <Tabs.Root value={activeTab} onValueChange={(value) => (pickedTab = value)} class="flex flex-col gap-4">
                 <Tabs.List class="grid w-full" style="grid-template-columns: repeat({tabs.length}, minmax(0, 1fr))">
                     {#each tabs as tab (tab.value)}
                         <Tabs.Trigger value={tab.value} class="px-1 text-xs min-[400px]:text-sm"
@@ -115,6 +131,11 @@
                     <Tabs.Content value="market"><MarketPulseSection {pulse} compact /></Tabs.Content>
                 {/if}
                 <Tabs.Content value="xp"><AlchXpSection {snapshot} compact /></Tabs.Content>
+                {#if corner}
+                    <Tabs.Content value="ironman">
+                        <IronmanCornerSection {corner} ironman={cornerFirst} compact />
+                    </Tabs.Content>
+                {/if}
             </Tabs.Root>
         </div>
     {:else if !failed}

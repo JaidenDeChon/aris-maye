@@ -23,12 +23,15 @@ import {
     HOMEPAGE_SNAPSHOT_MAX_AGE_MS,
 } from '$lib/constants/homepage';
 import { canonicalSkill } from '$lib/constants/skill-aliases';
+import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import type {
     HomepageAlchPick,
     HomepageAlmostUnlocked,
     HomepageCheapXp,
+    HomepageIronmanCorner,
     HomepageItem,
     HomepageMarketPulse,
+    HomepageShopSale,
     HomepageShortfall,
     HomepageSkillEarner,
     HomepageSnapshot,
@@ -337,17 +340,227 @@ async function computeMarketPulse(): Promise<HomepageMarketPulse> {
     };
 }
 
+/** An item's alch value after the nature rune, as an aggregation expression. 0 when it can't be alched. */
+function alchAfterRuneExpr(natureRunePrice: number) {
+    return { $max: [0, { $subtract: [{ $ifNull: ['$highalch', 0] }, natureRunePrice] }] };
+}
+
+/**
+ * Items an NPC shop pays more for than they alch for, best gain first, one shop per item.
+ *
+ * Only shops that pay in coins count; a Tokkul price isn't gp.
+ */
+async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSale[]> {
+    const rows = await OsrsboxItemModel.aggregate<
+        RawItem & {
+            shop: string;
+            firstPrice: number;
+            floorPrice: number;
+            salesToFloor: number | null;
+            alchValue: number;
+        }
+    >([
+        { $match: { 'storePrices.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
+        { $unwind: '$storePrices' },
+        { $match: { 'storePrices.currency': null, 'storePrices.firstPrice': { $gt: 0 } } },
+        { $set: { alchValue: alchAfterRuneExpr(natureRunePrice) } },
+        { $set: { gain: { $subtract: ['$storePrices.firstPrice', '$alchValue'] } } },
+        { $match: { gain: { $gt: 0 } } },
+        // The best-paying shop for each item, then the items with the biggest gain over alching.
+        { $sort: { id: 1, 'storePrices.firstPrice': -1 } },
+        { $group: { _id: '$id', doc: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$doc' } },
+        { $sort: { gain: -1, name: 1 } },
+        { $limit: HOMEPAGE_LIST_SIZE },
+        {
+            $project: {
+                ...ITEM_PROJECTION,
+                shop: '$storePrices.shop',
+                firstPrice: '$storePrices.firstPrice',
+                floorPrice: '$storePrices.floorPrice',
+                salesToFloor: '$storePrices.salesToFloor',
+                alchValue: 1,
+            },
+        },
+    ] as unknown as PipelineStage[]);
+
+    return rows.map((row) => ({
+        item: toHomepageItem(row),
+        shop: row.shop,
+        firstPrice: row.firstPrice,
+        floorPrice: row.floorPrice,
+        salesToFloor: row.salesToFloor ?? null,
+        alchValue: row.alchValue,
+    }));
+}
+
+/**
+ * Creations an Ironman can make entirely from shop stock and alch at a profit.
+ *
+ * Each ingredient is priced at the cheapest coin shop that stocks it, and coins at face value.
+ * Any ingredient no shop sells rules the creation out. Only shops that also buy from players are in
+ * the scraped data, so this can miss a few sell-only shops.
+ */
+async function computeShopSupplied(natureRunePrice: number): Promise<HomepageItem[]> {
+    const rows = await OsrsboxItemModel.aggregate<RawItem>([
+        { $match: { 'creationSpecs.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
+        { $set: { primarySpec: buildPrimarySpecExpression() } },
+        {
+            $set: {
+                consumed: {
+                    $filter: {
+                        input: { $ifNull: ['$primarySpec.ingredients', []] },
+                        as: 'ing',
+                        cond: { $ne: ['$$ing.consumedDuringCreation', false] },
+                    },
+                },
+            },
+        },
+        { $match: { 'consumed.0': { $exists: true } } },
+        {
+            $lookup: {
+                from: 'items',
+                localField: 'consumed.item',
+                foreignField: '_id',
+                pipeline: [{ $project: { _id: 1, name: 1, storePrices: 1 } }],
+                as: 'ingredientItems',
+            },
+        },
+        {
+            $set: {
+                shopCostRows: {
+                    $map: {
+                        input: '$consumed',
+                        as: 'ing',
+                        in: {
+                            $let: {
+                                vars: {
+                                    matched: {
+                                        $first: {
+                                            $filter: {
+                                                input: '$ingredientItems',
+                                                as: 'item',
+                                                cond: { $eq: ['$$item._id', '$$ing.item'] },
+                                            },
+                                        },
+                                    },
+                                },
+                                in: {
+                                    $let: {
+                                        vars: {
+                                            unit: {
+                                                $cond: [
+                                                    { $in: ['$$matched.name', [...currencyItemNames]] },
+                                                    1,
+                                                    {
+                                                        $min: {
+                                                            $map: {
+                                                                input: {
+                                                                    $filter: {
+                                                                        input: {
+                                                                            $ifNull: ['$$matched.storePrices', []],
+                                                                        },
+                                                                        as: 'sp',
+                                                                        cond: {
+                                                                            $and: [
+                                                                                {
+                                                                                    $eq: [
+                                                                                        {
+                                                                                            $ifNull: [
+                                                                                                '$$sp.currency',
+                                                                                                null,
+                                                                                            ],
+                                                                                        },
+                                                                                        null,
+                                                                                    ],
+                                                                                },
+                                                                                {
+                                                                                    $gt: [
+                                                                                        {
+                                                                                            $ifNull: [
+                                                                                                '$$sp.buyPrice',
+                                                                                                0,
+                                                                                            ],
+                                                                                        },
+                                                                                        0,
+                                                                                    ],
+                                                                                },
+                                                                                { $ne: ['$$sp.stock', 0] },
+                                                                            ],
+                                                                        },
+                                                                    },
+                                                                },
+                                                                as: 'sp',
+                                                                in: '$$sp.buyPrice',
+                                                            },
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                        },
+                                        in: {
+                                            $cond: [
+                                                { $gt: ['$$unit', 0] },
+                                                { $multiply: ['$$unit', { $ifNull: ['$$ing.amount', 1] }] },
+                                                null,
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        // Every ingredient has to come from a shop.
+        {
+            $match: {
+                $expr: { $allElementsTrue: { $map: { input: '$shopCostRows', as: 'c', in: { $ne: ['$$c', null] } } } },
+            },
+        },
+        { $set: { creationCost: { $sum: '$shopCostRows' } } },
+        { $set: { creationProfit: { $subtract: [alchAfterRuneExpr(natureRunePrice), '$creationCost'] } } },
+        { $match: { creationProfit: { $gt: 0 } } },
+        {
+            $set: {
+                creationRoi: {
+                    $cond: [{ $gt: ['$creationCost', 0] }, { $divide: ['$creationProfit', '$creationCost'] }, null],
+                },
+            },
+        },
+        { $sort: { creationProfit: -1, name: 1 } },
+        { $limit: HOMEPAGE_LIST_SIZE },
+        { $project: ITEM_PROJECTION },
+    ] as unknown as PipelineStage[]).allowDiskUse(true);
+
+    return rows.map(toHomepageItem);
+}
+
 /** Builds every global homepage section from scratch. */
 export async function computeHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
     const natureRunePrice = await getNatureRunePrice();
-    const [creation, alchPicks, marketPulse] = await Promise.all([
-        computeCreationSections(ironman, natureRunePrice),
+    // The Ironman corner shows for everyone, so the Ironman view of creations is always needed. For
+    // an Ironman snapshot it's also the main view, so it's only computed once.
+    const ironmanCreationPromise = computeCreationSections(true, natureRunePrice);
+    const [creation, ironmanCreation, alchPicks, marketPulse, shopSales, shopSupplied] = await Promise.all([
+        ironman ? ironmanCreationPromise : computeCreationSections(false, natureRunePrice),
+        ironmanCreationPromise,
         // An Ironman can't buy or sell on the GE, so these aren't open to them.
         ironman ? Promise.resolve([]) : computeAlchPicks(natureRunePrice),
         ironman ? Promise.resolve(null) : computeMarketPulse(),
+        computeShopSales(natureRunePrice),
+        computeShopSupplied(natureRunePrice),
     ]);
 
-    return { ironman, computedAt: Date.now(), natureRunePrice, ...creation, alchPicks, marketPulse };
+    const ironmanCorner: HomepageIronmanCorner = {
+        shopSales,
+        shopSupplied,
+        craftToAlch: ironmanCreation.topProfit,
+        cheapXp: ironmanCreation.cheapXp,
+    };
+
+    return { ironman, computedAt: Date.now(), natureRunePrice, ...creation, alchPicks, marketPulse, ironmanCorner };
 }
 
 type SnapshotDoc = { _id: string; snapshot: HomepageSnapshot };

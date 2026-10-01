@@ -161,7 +161,7 @@
                         />
                     {/each}
                 {:else}
-                    <p class="text-sm text-muted-foreground">Nothing you can make turns a {profitLabel} today.</p>
+                    <p class="text-sm text-muted-foreground">Nothing you can make turns a profit today.</p>
                 {/if}
             {/snippet}
             {@render column('Your best earners', `Top ${profitLabel} at your current levels.`, earnersBody)}

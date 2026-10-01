@@ -66,6 +66,37 @@ export type HomepageMarketPulse = {
     fallers: HomepageItem[];
 };
 
+/** Somewhere an Ironman can sell an item for more than it alchs for. */
+export type HomepageShopSale = {
+    item: HomepageItem;
+    shop: string;
+    /** What the shop pays for the first one. */
+    firstPrice: number;
+    /** The least it pays once overstocked. */
+    floorPrice: number;
+    /** How many sales until the price bottoms out, or null when it never drops. */
+    salesToFloor: number | null;
+    /** What one alchs for after the nature rune, for comparison. 0 when it can't be alched. */
+    alchValue: number;
+};
+
+/**
+ * Money-makers for accounts that can't use the GE. See "Ironman corner" in `docs/homepage-plan.md`.
+ * Built for every visitor; an Ironman profile sees it first.
+ */
+export type HomepageIronmanCorner = {
+    shopSales: HomepageShopSale[];
+    /**
+     * Creations whose every ingredient a shop sells. `creationCost` is what those ingredients cost
+     * from shops and `creationProfit` what's left after alching the result.
+     */
+    shopSupplied: HomepageItem[];
+    /** The best creations valued by alch on both sides, as an Ironman's profit pipeline sees them. */
+    craftToAlch: HomepageItem[];
+    /** Cheapest XP per skill, counted in alch value lost. */
+    cheapXp: HomepageCheapXp[];
+};
+
 /** Every global homepage section, computed in one go and cached. */
 export type HomepageSnapshot = {
     ironman: boolean;
@@ -80,6 +111,7 @@ export type HomepageSnapshot = {
     alchPicks: HomepageAlchPick[];
     /** Null for Ironmen, who can't trade on the GE. */
     marketPulse: HomepageMarketPulse | null;
+    ironmanCorner: HomepageIronmanCorner;
 };
 
 /** A skill the player is short in for an item they have almost unlocked. */
