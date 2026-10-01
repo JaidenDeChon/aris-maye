@@ -1,5 +1,6 @@
 <script lang="ts">
     import { NATURE_RUNE_FALLBACK_PRICE, alchemyValueAfterRune } from '$lib/constants/alchemy';
+    import { geSaleAfterTax } from '$lib/constants/ge-tax';
     import StatTile from '$lib/components/global/stat-tile.svelte';
     import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 
@@ -13,7 +14,8 @@
 
     const { gameItem, totalCost, natureRunePrice = NATURE_RUNE_FALLBACK_PRICE }: GameItemCreationProfitProps = $props();
 
-    const geValue = $derived(normalizeNumber(gameItem?.highPrice ?? gameItem?.lowPrice));
+    // The Grand Exchange keeps its tax from every sale, so the seller only sees what's left.
+    const geValue = $derived(geSaleAfterTax(normalizeNumber(gameItem?.highPrice ?? gameItem?.lowPrice), gameItem?.id));
     const storeValue = $derived(normalizeNumber(gameItem?.cost));
     const highAlchValue = $derived(alchemyValueAfterRune(gameItem?.highalch, natureRunePrice));
     const lowAlchValue = $derived(alchemyValueAfterRune(gameItem?.lowalch, natureRunePrice));
@@ -22,6 +24,7 @@
         {
             label: 'Sell on the GE',
             value: geValue,
+            hint: geValue === null ? undefined : 'After the 2% GE tax',
             icon: '/other-images/grand-exchange.png',
         },
         {

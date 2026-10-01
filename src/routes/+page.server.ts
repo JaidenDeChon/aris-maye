@@ -1,5 +1,13 @@
+import type { HomepageSnapshot } from '$lib/models/homepage';
+import { getHomepageSnapshot } from '$lib/services/homepage-service.server';
+
 interface HomepageData {
     imageUrl?: string;
+    /**
+     * The global sections, valued for a main. Null when they weren't ready in time, in which case
+     * the page shows a skeleton and the browser fetches them itself.
+     */
+    snapshot: HomepageSnapshot | null;
 }
 
 const npcImages: string[] = [
@@ -42,7 +50,27 @@ async function assembleHomepageData(): Promise<HomepageData['imageUrl']> {
     }
 }
 
+/**
+ * How long the server waits for the homepage sections before sending the page without them.
+ *
+ * A warm cache answers well inside this, so the page usually arrives complete. When the snapshot
+ * has to be built from scratch, waiting would hold the whole page, hero included, on a blank
+ * screen; sending a skeleton instead gets something on screen straight away.
+ */
+const SNAPSHOT_WAIT_MS = 400;
+
+async function loadSnapshot(): Promise<HomepageSnapshot | null> {
+    const snapshot = getHomepageSnapshot(false).catch((error) => {
+        // The hero and FAQ still work without the data sections, so a failure here shouldn't take
+        // the whole homepage down. The browser tries again on its own.
+        console.error('Failed to load homepage snapshot:', error);
+        return null;
+    });
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), SNAPSHOT_WAIT_MS));
+    return Promise.race([snapshot, timeout]);
+}
+
 export async function load(): Promise<HomepageData> {
-    const imageUrl = await assembleHomepageData();
-    return { imageUrl };
+    const [imageUrl, snapshot] = await Promise.all([assembleHomepageData(), loadSnapshot()]);
+    return { imageUrl, snapshot };
 }

@@ -5,6 +5,8 @@ import { OsrsboxItemModel, type OsrsboxItemDocument } from '$lib/models/mongo-sc
 import { NATURE_RUNE_FALLBACK_PRICE, NATURE_RUNE_ITEM_ID } from '$lib/constants/alchemy';
 import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 import { currencyItemNames } from '$lib/helpers/ingredient-price';
+import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
+import { skillSpellings } from '$lib/constants/skill-aliases';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -38,7 +40,7 @@ export type PlayerSupplies = Record<string, number>;
 let natureRunePriceCache: { price: number; readAt: number } | null = null;
 const NATURE_RUNE_CACHE_MS = 5 * 60 * 1000;
 
-async function getNatureRunePrice(): Promise<number> {
+export async function getNatureRunePrice(): Promise<number> {
     if (natureRunePriceCache && Date.now() - natureRunePriceCache.readAt < NATURE_RUNE_CACHE_MS) {
         return natureRunePriceCache.price;
     }
@@ -598,7 +600,17 @@ export function buildProfitPipeline(
             },
         ],
     };
-    const geOutputPriceExpr = { $ifNull: ['$highPrice', { $ifNull: ['$lowPrice', '$cost'] }] };
+    // Selling on the Grand Exchange costs the seller its tax, so a GE price is counted net of it.
+    // The `cost` fallback is not a GE sale and keeps its full value.
+    const geOutputPriceExpr = {
+        $let: {
+            // The trailing null keeps a missing field from leaving `geSale` missing, which `$eq` would not match.
+            vars: { geSale: { $ifNull: ['$highPrice', { $ifNull: ['$lowPrice', null] }] } },
+            in: {
+                $cond: [{ $eq: ['$$geSale', null] }, '$cost', geSaleAfterTaxExpr('$$geSale', '$id')],
+            },
+        },
+    };
 
     /**
      * What an item is worth to an account that cannot trade, as an aggregation expression.
@@ -655,6 +667,7 @@ export function buildProfitPipeline(
                             },
                             in: {
                                 itemId: '$$matched.id',
+                                buyLimit: '$$matched.buy_limit',
                                 amount: '$$amount',
                                 unitPrice: '$$unitPrice',
                                 supplyQty: '$$supplyQty',
@@ -761,6 +774,7 @@ export function buildProfitPipeline(
                             cost: 1,
                             highalch: 1,
                             tradeable_on_ge: 1,
+                            buy_limit: 1,
                         },
                     },
                 ],
@@ -821,6 +835,33 @@ export function buildProfitPipeline(
 
     if (enforceSupplies && hasSupplies) {
         pipeline.push({ $match: { $expr: suppliesSatisfiedExpr } });
+    }
+
+    if (!ironman) {
+        // How many times a main can make this every 4 hours before an ingredient's GE buy limit
+        // stops them. Only ingredients they still have to buy count; ones without a limit (coins)
+        // never run out. Null when nothing bought has a limit.
+        pipeline.push({
+            $set: {
+                craftsPerLimit: {
+                    $min: {
+                        $map: {
+                            input: {
+                                $filter: {
+                                    input: '$ingredientCostRows',
+                                    as: 'row',
+                                    cond: {
+                                        $and: [{ $gt: ['$$row.needed', 0] }, { $gt: ['$$row.buyLimit', 0] }],
+                                    },
+                                },
+                            },
+                            as: 'row',
+                            in: { $floor: { $divide: ['$$row.buyLimit', '$$row.amount'] } },
+                        },
+                    },
+                },
+            },
+        });
     }
 
     if (ironman) {
@@ -943,7 +984,7 @@ function buildSuppliesFilterPipeline(supplies?: PlayerSupplies | null): Record<s
     ];
 }
 
-function buildPrimarySpecExpression() {
+export function buildPrimarySpecExpression() {
     return {
         $let: {
             vars: { specs: { $ifNull: ['$creationSpecs', []] } },
@@ -992,13 +1033,15 @@ function mergeQueries(...queries: (Record<string, unknown> | null)[]): Record<st
 /**
  * Normalizes incoming skill level data to a lowercase map of finite numbers.
  */
-function normalizeSkillLevels(skillLevels?: PlayerSkillLevels | null): PlayerSkillLevels | null {
+export function normalizeSkillLevels(skillLevels?: PlayerSkillLevels | null): PlayerSkillLevels | null {
     if (!skillLevels || typeof skillLevels !== 'object') return null;
 
     const normalizedEntries = Object.entries(skillLevels).reduce<[string, number][]>((acc, [skill, level]) => {
         const numericLevel = Math.max(0, Math.floor(Number(level)));
         if (!Number.isFinite(numericLevel)) return acc;
-        acc.push([skill.toLowerCase(), numericLevel]);
+        // Recipe data can spell a skill the wiki's way ("runecraft"), so the level is filed under
+        // every spelling the skill-match expression might look it up by.
+        for (const spelling of skillSpellings(skill)) acc.push([spelling, numericLevel]);
         return acc;
     }, []);
 
@@ -1016,7 +1059,7 @@ function normalizeSkillFilter(skill?: string | null): string | null {
  * Builds an expression that matches items where at least one creation spec's required skills are satisfied by the
  * provided player skill levels.
  */
-function buildPlayerSkillMatchExpression(skillLevels: PlayerSkillLevels) {
+export function buildPlayerSkillMatchExpression(skillLevels: PlayerSkillLevels) {
     return {
         $gt: [
             {
