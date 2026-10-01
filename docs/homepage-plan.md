@@ -44,16 +44,23 @@ under 24 hours old.
 | ----------------- | ------------------------------------------------------ |
 | Best profit       | max `creationProfit`, with the item name               |
 | Best ROI          | max `creationRoi`                                      |
-| Best GP per limit | max `creationProfit × buyLimit`                        |
+| Best GP per limit | max `creationProfit × craftsPerLimit`                  |
 | Most traded       | max `volume1h` (PR 2)                                  |
 | Biggest mover     | max \|`priceChange24h`\| above the volume floor (PR 2) |
 
 ### 3. Make right now
 
-The existing `roi-value-desc` and `roi-desc` sorts, plus a new **GP per limit** sort:
-`creationProfit × min(buyLimit, volume24h / 6)`. Capping by volume stops an item with a big buy
-limit that barely trades from claiming the top spot. Until PR 2 lands it falls back to the buy limit
-alone.
+The existing `roi-value-desc` and `roi-desc` sorts, plus a new **GP per limit** ranking:
+`creationProfit × craftsPerLimit`.
+
+`craftsPerLimit` is how many times you can make the item before one of its **ingredients** hits its
+4-hour GE buy limit: the smallest `floor(buy_limit / amount)` across the ingredients you still have to
+buy. It's the ingredients' limits that matter, not the finished item's, because selling on the GE has
+no limit. Ingredients with no limit (coins) are ignored, and an item where nothing bought has a limit
+is left out. Main accounts only.
+
+The ROI ranking only counts items making at least `HOMEPAGE_MIN_ROI_PROFIT` (100 gp) each, so items
+that cost 2 gp and sell for 5 don't fill the list.
 
 ### 4. Top earner per skill
 
@@ -104,8 +111,8 @@ The 10-trade minimum stops a single sale of an expensive item from counting.
 
 ### 6. Alch & cheap XP
 
-- **High alch picks:** `highalch − buyPrice − natureRunePrice`, where `buyPrice` is `lowPrice` falling
-  back to `highPrice`. Shows the buy limit so the visitor can see how many they can do per 4 hours.
+- **High alch picks:** `highalch − buyPrice − natureRunePrice`, where `buyPrice` is `highPrice`, the
+  instant-buy price, since that's what it costs to get one now. Prices older than 24 hours are skipped. Shows the buy limit so the visitor can see how many they can do per 4 hours.
 - **Cheapest XP:** for each skill, the creation with the lowest `max(0, −creationProfit) / xp`, using
   the matching `experienceGranted` row. Shown as "x gp/xp". A profitable creation counts as 0 gp/xp
   and is tagged "pays you".
@@ -167,12 +174,19 @@ history covers 24 hours. The volume fields could also power new sorts on `/items
 
 ## Performance
 
-The homepage runs about 6 aggregations, several of them over the profit pipeline, which already spills to
-disk. To keep page loads fast, the hourly job also computes a single `homepage-snapshot` document
-(the global stat strip and band contents) and the page reads that one document. Only the
-personalized modules query live, and they render on the client after first paint with skeletons.
-The snapshot ships in PR 1. If it's missing or more than 2 hours old, the page falls back to
-querying live.
+The profit pipeline is the expensive part and already spills to disk, so it runs once per snapshot
+and `$facet` cuts the result into every global list. The snapshot is stored in the
+`homepage-snapshots` collection (one document for mains, one for Ironmen), and the page reads that
+single document.
+
+- **Refresh:** after updating prices, the hourly job calls `POST /api/homepage/refresh` with an
+  `x-refresh-token` header. The job can't import the homepage service directly because its bundler
+  can't resolve `$lib` imports. The endpoint only exists when `HOMEPAGE_REFRESH_TOKEN` is set on the
+  site, and the job skips the call when it isn't.
+- **Fallback:** a snapshot older than 65 minutes (`HOMEPAGE_SNAPSHOT_MAX_AGE_MS`) or missing is rebuilt
+  on the request that finds it, so the page works without the token, just slower for one visitor an
+  hour.
+- **Personal sections** query live from the browser and show skeletons while they load.
 
 ## Delivery
 
