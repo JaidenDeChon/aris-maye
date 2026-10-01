@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import { formatGpPerXp, formatGpShort, formatRoi, pickSkillToTrain, skillIcon, skillLabel } from './homepage';
+import {
+    formatChange,
+    formatGpPerXp,
+    formatGpShort,
+    formatRoi,
+    pickSkillToTrain,
+    skillIcon,
+    skillLabel,
+} from './homepage';
 import type { HomepageAlmostUnlocked, HomepageItem } from '$lib/models/homepage';
 
 function item(id: number, creationProfit: number): HomepageItem {
@@ -16,6 +24,9 @@ function item(id: number, creationProfit: number): HomepageItem {
         ironmanExitValue: null,
         craftsPerLimit: null,
         gpPerLimit: null,
+        volume1h: null,
+        volume24h: null,
+        priceChange24h: null,
     };
 }
 
@@ -94,5 +105,13 @@ describe('skillIcon', () => {
     it("finds the Runecrafting icon for the wiki's Runecraft", () => {
         expect(skillIcon('Runecraft')).toBe('/skill-images/runecrafting.png');
         expect(skillLabel('runecraft')).toBe('Runecrafting');
+    });
+});
+
+describe('formatChange', () => {
+    it('signs and rounds a price change', () => {
+        expect(formatChange(0.052)).toBe('+5.2%');
+        expect(formatChange(-0.31)).toBe('-31%');
+        expect(formatChange(0)).toBe('0.0%');
     });
 });

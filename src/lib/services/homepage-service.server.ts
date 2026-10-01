@@ -10,6 +10,12 @@ import {
     type PlayerSkillLevels,
 } from '$lib/services/game-item-mongo-service.server';
 import {
+    MOVERS_MIN_GP_PER_DAY,
+    MOVERS_MIN_TRADES_PER_DAY,
+    PRICE_CHANGE_MIN_HOURS,
+    VOLUME_HISTORY_HOURS,
+} from '$lib/constants/market';
+import {
     HOMEPAGE_ALCH_MAX_PRICE_AGE_S,
     HOMEPAGE_ALMOST_UNLOCKED_LEVELS,
     HOMEPAGE_LIST_SIZE,
@@ -22,12 +28,22 @@ import type {
     HomepageAlmostUnlocked,
     HomepageCheapXp,
     HomepageItem,
+    HomepageMarketPulse,
     HomepageShortfall,
     HomepageSkillEarner,
     HomepageSnapshot,
 } from '$lib/models/homepage';
 
 const SNAPSHOT_COLLECTION = 'homepage-snapshots';
+
+/**
+ * Bump whenever the snapshot's shape changes.
+ *
+ * Deploy previews share the production database, so without this a preview would read the snapshot
+ * production's older code keeps writing, and the sections it adds would never appear. Each version
+ * reads and writes its own document.
+ */
+const SNAPSHOT_VERSION = 2;
 
 /** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
 const MEMORY_CACHE_MS = 60 * 1000;
@@ -50,6 +66,9 @@ const ITEM_PROJECTION = {
     ironmanExitValue: 1,
     craftsPerLimit: 1,
     gpPerLimit: 1,
+    volume1h: 1,
+    volume24h: 1,
+    priceChange24h: 1,
 } as const;
 
 type RawItem = {
@@ -65,6 +84,9 @@ type RawItem = {
     ironmanExitValue?: number | null;
     craftsPerLimit?: number | null;
     gpPerLimit?: number | null;
+    volume1h?: number | null;
+    volume24h?: number | null;
+    priceChange24h?: number | null;
 };
 
 function toHomepageItem(raw: RawItem): HomepageItem {
@@ -82,6 +104,9 @@ function toHomepageItem(raw: RawItem): HomepageItem {
         ironmanExitValue: num(raw.ironmanExitValue),
         craftsPerLimit: num(raw.craftsPerLimit),
         gpPerLimit: num(raw.gpPerLimit),
+        volume1h: num(raw.volume1h),
+        volume24h: num(raw.volume24h),
+        priceChange24h: num(raw.priceChange24h),
     };
 }
 
@@ -259,16 +284,79 @@ async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPi
     }));
 }
 
+/**
+ * What's trading on the GE: the most traded items this hour, and the biggest risers and fallers
+ * over the last day among items that trade enough for their price to mean something.
+ */
+async function computeMarketPulse(): Promise<HomepageMarketPulse> {
+    const tradeable = { tradeable_on_ge: true, placeholder: false, noted: false, stacked: null };
+    // The movers floor: enough gold and enough trades a day. See "Movers floor" in the plan doc.
+    const liquid = {
+        priceChange24h: { $ne: null },
+        volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
+        $expr: {
+            $gte: [
+                { $multiply: ['$volume24h', { $ifNull: [{ $avg: ['$highPrice', '$lowPrice'] }, 0] }] },
+                MOVERS_MIN_GP_PER_DAY,
+            ],
+        },
+    };
+
+    const [facets] = await OsrsboxItemModel.aggregate<{
+        historyHours: { hours: number }[];
+        mostTraded: RawItem[];
+        risers: RawItem[];
+        fallers: RawItem[];
+    }>([
+        { $match: tradeable },
+        {
+            $facet: {
+                historyHours: [
+                    { $match: { 'volumeHistory.0': { $exists: true } } },
+                    { $group: { _id: null, hours: { $max: { $size: '$volumeHistory' } } } },
+                ],
+                mostTraded: [
+                    { $match: { volume1h: { $gt: 0 } } },
+                    { $sort: { volume1h: -1, name: 1 } },
+                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $project: ITEM_PROJECTION },
+                ],
+                risers: [
+                    { $match: { ...liquid, priceChange24h: { $gt: 0 } } },
+                    { $sort: { priceChange24h: -1, name: 1 } },
+                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $project: ITEM_PROJECTION },
+                ],
+                fallers: [
+                    { $match: { ...liquid, priceChange24h: { $lt: 0 } } },
+                    { $sort: { priceChange24h: 1, name: 1 } },
+                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $project: ITEM_PROJECTION },
+                ],
+            },
+        },
+    ] as unknown as PipelineStage[]);
+
+    return {
+        historyHours: Math.min(VOLUME_HISTORY_HOURS, facets?.historyHours?.[0]?.hours ?? 0),
+        hoursNeeded: PRICE_CHANGE_MIN_HOURS,
+        mostTraded: (facets?.mostTraded ?? []).map(toHomepageItem),
+        risers: (facets?.risers ?? []).map(toHomepageItem),
+        fallers: (facets?.fallers ?? []).map(toHomepageItem),
+    };
+}
+
 /** Builds every global homepage section from scratch. */
 export async function computeHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
     const natureRunePrice = await getNatureRunePrice();
-    const [creation, alchPicks] = await Promise.all([
+    const [creation, alchPicks, marketPulse] = await Promise.all([
         computeCreationSections(ironman, natureRunePrice),
-        // An Ironman can't buy on the GE, so buying something to alch isn't open to them.
+        // An Ironman can't buy or sell on the GE, so these aren't open to them.
         ironman ? Promise.resolve([]) : computeAlchPicks(natureRunePrice),
+        ironman ? Promise.resolve(null) : computeMarketPulse(),
     ]);
 
-    return { ironman, computedAt: Date.now(), natureRunePrice, ...creation, alchPicks };
+    return { ironman, computedAt: Date.now(), natureRunePrice, ...creation, alchPicks, marketPulse };
 }
 
 type SnapshotDoc = { _id: string; snapshot: HomepageSnapshot };
@@ -297,7 +385,7 @@ function rebuildOnce(ironman: boolean): Promise<HomepageSnapshot> {
 }
 
 function snapshotKey(ironman: boolean): string {
-    return ironman ? 'ironman' : 'ge';
+    return `${ironman ? 'ironman' : 'ge'}-v${SNAPSHOT_VERSION}`;
 }
 
 /**

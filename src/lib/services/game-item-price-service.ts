@@ -1,6 +1,7 @@
 import { OsrsboxItemModel } from '../models/mongo-schemas/osrsbox-db-item-schema';
 import { CollectionMetadataModel } from '../models/mongo-schemas/collection-metadata-schema';
-import { geDataCombined } from './grand-exchange-api-service';
+import { geDataCombined, prices } from './grand-exchange-api-service';
+import { addVolumeHour, toVolumeEntry, type HourlyPrice, type VolumeHistoryEntry } from '../helpers/volume-history';
 import consola from 'consola';
 import type { AnyBulkWriteOperation } from 'mongoose';
 
@@ -16,10 +17,31 @@ function isValidTime(value: number | null | undefined): value is number {
 }
 
 /**
- * Updates the prices of all GameItems in the database.
+ * The last full hour of trading, from the wiki's `/1h` endpoint, with the hour it covers.
+ *
+ * Volume is a bonus on top of prices, so a failed fetch is logged and the run carries on with
+ * prices alone. That hour is simply missing from every item's history.
+ */
+async function fetchLastHour(): Promise<{ hour: number; data: Record<string, HourlyPrice> } | null> {
+    try {
+        const data = await prices({ timestep: '1h', timestamp: '' });
+        const hour = Object.values(data)[0]?.timestamp;
+        if (typeof hour !== 'number' || !Number.isFinite(hour)) {
+            logger.warn('Hourly volume data had no timestamp; skipping volume this run.');
+            return null;
+        }
+        return { hour, data };
+    } catch (error) {
+        logger.error('Failed to fetch hourly volume data; skipping volume this run.', error);
+        return null;
+    }
+}
+
+/**
+ * Updates the prices of all GameItems in the database, and their rolling trade volume.
  */
 export async function updateAllGameItemPricesInMongo(): Promise<void> {
-    const updatedGameItems = await geDataCombined();
+    const [updatedGameItems, lastHour] = await Promise.all([geDataCombined(), fetchLastHour()]);
     const gameItemsInMongo = await OsrsboxItemModel.find(
         {},
         {
@@ -28,6 +50,7 @@ export async function updateAllGameItemPricesInMongo(): Promise<void> {
             tradeable_on_ge: 1,
             highPrice: 1,
             lowPrice: 1,
+            volumeHistory: 1,
         },
     )
         .lean()
@@ -38,6 +61,7 @@ export async function updateAllGameItemPricesInMongo(): Promise<void> {
     let geEligibleCount = 0;
     let skippedNonGe = 0;
     let clearedSentinelCount = 0;
+    let volumeUpdates = 0;
 
     // Update the price of every game item in MongoDB.
     for (const item of gameItemsInMongo) {
@@ -53,7 +77,7 @@ export async function updateAllGameItemPricesInMongo(): Promise<void> {
             continue;
         }
 
-        const setUpdate: Record<string, number> = {};
+        const setUpdate: Record<string, unknown> = {};
         const unsetUpdate: Record<string, ''> = {};
 
         if (isValidPrice(fullItemData.highPrice)) {
@@ -76,6 +100,16 @@ export async function updateAllGameItemPricesInMongo(): Promise<void> {
             unsetUpdate.lowPrice = '';
             unsetUpdate.lowTime = '';
             clearedSentinelCount += 1;
+        }
+
+        if (lastHour) {
+            const entry = toVolumeEntry(lastHour.data[item.id], lastHour.hour);
+            const summary = addVolumeHour(item.volumeHistory as VolumeHistoryEntry[] | undefined, entry);
+            setUpdate.volumeHistory = summary.volumeHistory;
+            setUpdate.volume1h = summary.volume1h;
+            setUpdate.volume24h = summary.volume24h;
+            setUpdate.priceChange24h = summary.priceChange24h;
+            volumeUpdates += 1;
         }
 
         if (!Object.keys(setUpdate).length && !Object.keys(unsetUpdate).length) {
@@ -101,6 +135,11 @@ export async function updateAllGameItemPricesInMongo(): Promise<void> {
     );
     if (skippedNonGe) {
         logger.info(`Skipped ${skippedNonGe} items not tradeable on GE.`);
+    }
+    if (lastHour) {
+        logger.info(
+            `Recorded trade volume for ${volumeUpdates} items for the hour starting ${new Date(lastHour.hour * 1000).toISOString()}.`,
+        );
     }
     if (clearedSentinelCount) {
         logger.info(`Cleared sentinel price values on ${clearedSentinelCount} fields.`);

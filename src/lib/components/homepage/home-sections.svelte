@@ -6,6 +6,7 @@
     import MakeNowSection from './make-now-section.svelte';
     import SkillEarnersSection from './skill-earners-section.svelte';
     import AlchXpSection from './alch-xp-section.svelte';
+    import MarketPulseSection from './market-pulse-section.svelte';
     import HomeSectionsSkeleton from './home-sections-skeleton.svelte';
     import { activeIsIronman } from '$lib/stores/character-store.svelte';
     import { timeSince } from '$lib/helpers/time-since';
@@ -56,9 +57,13 @@
         return () => controller.abort();
     });
 
+    // Snapshots cached before Market pulse existed have no `marketPulse` at all.
+    const pulse = $derived(snapshot?.marketPulse ?? null);
+
     const tabs = $derived([
         { value: 'make', label: 'Make' },
         { value: 'skills', label: 'By skill' },
+        ...(pulse ? [{ value: 'market', label: 'Market' }] : []),
         { value: 'xp', label: snapshot && !snapshot.ironman && snapshot.alchPicks.length ? 'Alch & XP' : 'XP' },
     ]);
     let activeTab = $state('make');
@@ -88,19 +93,27 @@
         <div class="hidden flex-col gap-14 md:flex">
             <MakeNowSection {snapshot} />
             <SkillEarnersSection {snapshot} />
+            {#if pulse}
+                <MarketPulseSection {pulse} />
+            {/if}
             <AlchXpSection {snapshot} />
         </div>
 
         <!-- Phones: the same sections as tabs. -->
         <div class="md:hidden">
             <Tabs.Root bind:value={activeTab} class="flex flex-col gap-4">
-                <Tabs.List class="grid w-full grid-cols-3">
+                <Tabs.List class="grid w-full" style="grid-template-columns: repeat({tabs.length}, minmax(0, 1fr))">
                     {#each tabs as tab (tab.value)}
-                        <Tabs.Trigger value={tab.value}>{tab.label}</Tabs.Trigger>
+                        <Tabs.Trigger value={tab.value} class="px-1 text-xs min-[400px]:text-sm"
+                            >{tab.label}</Tabs.Trigger
+                        >
                     {/each}
                 </Tabs.List>
                 <Tabs.Content value="make"><MakeNowSection {snapshot} compact /></Tabs.Content>
                 <Tabs.Content value="skills"><SkillEarnersSection {snapshot} compact /></Tabs.Content>
+                {#if pulse}
+                    <Tabs.Content value="market"><MarketPulseSection {pulse} compact /></Tabs.Content>
+                {/if}
                 <Tabs.Content value="xp"><AlchXpSection {snapshot} compact /></Tabs.Content>
             </Tabs.Root>
         </div>

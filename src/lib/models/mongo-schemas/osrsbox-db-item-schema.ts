@@ -135,6 +135,14 @@ export const osrsboxItemSchema: Schema<OsrsboxItemDocument> = new Schema(
         highTime: { type: Number, required: false },
         lowPrice: { type: Number, required: false },
         lowTime: { type: Number, required: false },
+        // Written by the hourly price job from the wiki's `/1h` endpoint. See `helpers/volume-history.ts`.
+        volume1h: { type: Number, required: false },
+        volume24h: { type: Number, required: false },
+        priceChange24h: { type: Number, default: undefined },
+        volumeHistory: {
+            type: [{ _id: false, t: Number, v: Number, mid: { type: Number, default: null } }],
+            default: undefined,
+        },
         creationSpecs: { type: [creationSpecsSchema], default: [] },
     },
     { collection: 'items' },
@@ -144,6 +152,8 @@ export const osrsboxItemSchema: Schema<OsrsboxItemDocument> = new Schema(
 // don't collection-scan; the name index serves prefix-anchored search regexes.
 osrsboxItemSchema.index({ tradeable_on_ge: 1, placeholder: 1, noted: 1, stacked: 1, highPrice: -1 });
 osrsboxItemSchema.index({ name: 1 });
+// Serves the homepage's "most traded" list.
+osrsboxItemSchema.index({ tradeable_on_ge: 1, volume1h: -1 });
 
 export const OsrsboxItemModel: Model<OsrsboxItemDocument> =
     mongoose.models.OsrsboxItem || mongoose.model<OsrsboxItemDocument>('OsrsboxItem', osrsboxItemSchema);

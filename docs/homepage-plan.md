@@ -71,8 +71,14 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 ### 5. Market pulse (PR 2)
 
 - **Most traded:** `volume1h` (high + low volume), with the GP value traded shown as a secondary number.
-- **Risers / fallers:** `priceChange24h = (mid − mid24hAgo) / mid24hAgo`, where `mid` is the mean of
-  `highPrice` and `lowPrice`. Only items that pass the movers floor below count.
+- **Risers / fallers:** `priceChange24h = (latestMid − firstMid) / firstMid`, comparing the average price
+  of the first and latest hours in the item's day of history that had trades. Hourly averages are
+  steadier than single latest prices. Only items that pass the movers floor below count.
+- **Before there's enough data:** the band still shows. With no history at all it's one "Coming soon"
+  card. Once there's an hour, Most traded fills in, and risers and fallers show a "Coming soon" card with
+  a progress bar ("7 of 23 hours of trade data collected") until the history spans 23 hours
+  (`PRICE_CHANGE_MIN_HOURS`, one short of a day so a single missed run doesn't hide them).
+- Mains only. Ironmen can't trade on the GE, so the band and its tiles are left out for them.
 
 #### Movers floor
 
@@ -155,22 +161,28 @@ and the item page's profit breakdown so they show the tax as its own row.
 
 ## Data changes (PR 2)
 
-The hourly job also fetches `/api/v1/osrs/1h` (one bulk request) and writes to each item:
+The hourly job also fetches `/api/v1/osrs/1h` (one bulk request for the last full hour) and writes to
+each GE item, through `helpers/volume-history.ts`:
 
 ```ts
-volume1h: number; // highPriceVolume + lowPriceVolume
 volumeHistory: {
     t: number;
     v: number;
     mid: number | null;
 }
-[]; // $push with $slice: -24
+[]; // the last 24 hours, oldest first
+volume1h: number; // traded in the latest hour, buys and sells together
 volume24h: number; // sum of volumeHistory.v
-priceChange24h: number | null; // from volumeHistory[0].mid
+priceChange24h: number | null; // null until the history spans PRICE_CHANGE_MIN_HOURS
 ```
 
-Add an index on `{ tradeable_on_ge: 1, volume1h: -1 }`. The Market pulse band stays hidden until the
-history covers 24 hours. The volume fields could also power new sorts on `/items` later.
+A second run in the same hour replaces that hour instead of counting it twice. An item missing from the
+hour's data traded nothing and gets a zero entry. If the `/1h` fetch fails, the run logs it and updates
+prices alone. The numbers live in `src/lib/constants/market.ts`, which has no imports so the job's bundler
+can read it.
+
+There's an index on `{ tradeable_on_ge: 1, volume1h: -1 }`. The volume fields could also power new sorts
+on `/items` later.
 
 ## Performance
 

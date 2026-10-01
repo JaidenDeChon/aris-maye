@@ -112,3 +112,12 @@ export function pickSkillToTrain(almostUnlocked: HomepageAlmostUnlocked[]): Skil
     }
     return pick;
 }
+
+/** A price change ratio such as 0.052 as "+5.2%". */
+export function formatChange(value: number | null | undefined): string {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+    const percent = value * 100;
+    const rounded =
+        Math.abs(percent) < 10 ? (Math.round(percent * 10) / 10).toFixed(1) : Math.round(percent).toString();
+    return `${percent > 0 ? '+' : ''}${rounded}%`;
+}
