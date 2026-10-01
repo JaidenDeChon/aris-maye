@@ -47,4 +47,13 @@ describe('buildProfitPipeline pricing seams', () => {
         expect(stageText(true)).toContain('ironmanExitValue');
         expect(stageText(false)).not.toContain('ironmanExitValue');
     });
+
+    // The seller pays the Grand Exchange tax, so a main's profit is counted after it.
+    it('takes the GE tax off the output for a main', () => {
+        expect(stageText(false)).toContain('0.02');
+    });
+
+    it('charges no GE tax under Ironman', () => {
+        expect(stageText(true)).not.toContain('0.02');
+    });
 });
