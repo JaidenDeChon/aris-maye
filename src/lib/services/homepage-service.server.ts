@@ -36,6 +36,15 @@ import type {
 
 const SNAPSHOT_COLLECTION = 'homepage-snapshots';
 
+/**
+ * Bump whenever the snapshot's shape changes.
+ *
+ * Deploy previews share the production database, so without this a preview would read the snapshot
+ * production's older code keeps writing, and the sections it adds would never appear. Each version
+ * reads and writes its own document.
+ */
+const SNAPSHOT_VERSION = 2;
+
 /** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
 const MEMORY_CACHE_MS = 60 * 1000;
 
@@ -376,7 +385,7 @@ function rebuildOnce(ironman: boolean): Promise<HomepageSnapshot> {
 }
 
 function snapshotKey(ironman: boolean): string {
-    return ironman ? 'ironman' : 'ge';
+    return `${ironman ? 'ironman' : 'ge'}-v${SNAPSHOT_VERSION}`;
 }
 
 /**
