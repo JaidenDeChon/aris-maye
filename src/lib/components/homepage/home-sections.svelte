@@ -70,7 +70,7 @@
 <!-- If the data can't be loaded at all, the sections step aside and the hero and FAQ carry on. -->
 <div class="content-sizing flex flex-col gap-10 md:gap-14">
     {#if snapshot || !failed}
-        <div class="flex flex-col gap-2 pt-8 md:gap-3 md:pt-0">
+        <div class="flex flex-col gap-2 pt-8 md:gap-3 md:pt-12">
             {#if snapshot}
                 <HomeStatStrip {snapshot} />
                 <!-- Kept in the layout before the time is known so the page doesn't shift when it appears. -->
