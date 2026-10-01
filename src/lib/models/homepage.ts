@@ -127,3 +127,16 @@ export type HomepageAlmostUnlocked = {
     item: HomepageItem;
     shortfalls: HomepageShortfall[];
 };
+
+/** The most XP per action a player can get in one skill at their current levels. */
+export type HomepageBestXp = {
+    skill: string;
+    item: HomepageItem;
+    /** XP for making one. */
+    xp: number;
+    /**
+     * What each XP costs: 0 when making it turns a profit, null when an ingredient has no value to
+     * put on it.
+     */
+    gpPerXp: number | null;
+};

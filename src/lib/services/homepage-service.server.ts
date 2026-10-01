@@ -28,6 +28,7 @@ import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import type {
     HomepageAlchPick,
     HomepageAlmostUnlocked,
+    HomepageBestXp,
     HomepageCheapXp,
     HomepageIronmanCorner,
     HomepageItem,
@@ -713,4 +714,80 @@ export async function getAlmostUnlocked(
     return rows
         .map((row) => ({ item: toHomepageItem(row), shortfalls: findShortfalls(row.primarySpec, levels) }))
         .filter((row) => row.shortfalls.length > 0);
+}
+
+/**
+ * For each skill, the creation that gives the most XP per action at the player's levels.
+ *
+ * This doesn't depend on anything turning a profit, so a player always gets something to work
+ * toward. Values follow the account type: an Ironman's costs come from alch values, never the GE.
+ * @param skillLevels - The player's levels, keyed by lowercase skill name.
+ * @param ironman - Whether to value items the Ironman way.
+ * @param limit - How many skills to return, most XP first.
+ */
+export async function getBestXp(
+    skillLevels: PlayerSkillLevels,
+    ironman: boolean,
+    limit = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageBestXp[]> {
+    const levels = normalizeSkillLevels(skillLevels);
+    if (!levels) return [];
+    const natureRunePrice = ironman ? await getIronmanNatureRunePrice() : undefined;
+
+    const rows = await OsrsboxItemModel.aggregate<{ _id: string; item: RawItem; xp: number; gpPerXp: number | null }>([
+        { $match: baseCreationMatch(ironman) },
+        { $match: { $expr: buildPlayerSkillMatchExpression(levels) } },
+        { $unset: ['equipment', 'weapon'] },
+        ...buildProfitPipeline(null, false, false, false, ironman, natureRunePrice),
+        { $set: { primarySpec: buildPrimarySpecExpression() } },
+        { $unwind: '$primarySpec.experienceGranted' },
+        { $match: { 'primarySpec.experienceGranted.experienceAmount': { $gt: 0 } } },
+        {
+            $set: {
+                xp: '$primarySpec.experienceGranted.experienceAmount',
+                gpPerXp: {
+                    $cond: [
+                        { $eq: [{ $ifNull: ['$creationProfit', null] }, null] },
+                        null,
+                        {
+                            $divide: [
+                                { $max: [0, { $multiply: ['$creationProfit', -1] }] },
+                                '$primarySpec.experienceGranted.experienceAmount',
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        // Most XP first; among equals, the one with a known cost, then the cheaper.
+        { $set: { costKnown: { $ne: ['$gpPerXp', null] } } },
+        { $sort: { xp: -1, costKnown: -1, gpPerXp: 1, name: 1 } },
+        {
+            $group: {
+                _id: { $toLower: '$primarySpec.experienceGranted.skillName' },
+                item: {
+                    $first: Object.fromEntries(
+                        Object.keys(ITEM_PROJECTION)
+                            .filter((k) => k !== '_id')
+                            .map((k) => [k, `$$ROOT.${k}`]),
+                    ),
+                },
+                xp: { $first: '$xp' },
+                gpPerXp: { $first: '$gpPerXp' },
+            },
+        },
+    ] as unknown as PipelineStage[]).allowDiskUse(true);
+
+    // Two spellings of one skill ("runecraft", "runecrafting") are merged, keeping the bigger XP.
+    const bySkill = new Map<string, HomepageBestXp>();
+    for (const row of rows) {
+        const skill = canonicalSkill(row._id);
+        if (!skill) continue;
+        const existing = bySkill.get(skill);
+        if (existing && existing.xp >= row.xp) continue;
+        bySkill.set(skill, { skill, item: toHomepageItem(row.item), xp: row.xp, gpPerXp: row.gpPerXp });
+    }
+    return Array.from(bySkill.values())
+        .sort((a, b) => b.xp - a.xp)
+        .slice(0, limit);
 }
