@@ -31,7 +31,7 @@ FAQ (existing)
 
 Under the `md` breakpoint, sections 3–7 become one card built on `ui/tabs`, with a short label per
 tab. The stat strip scrolls sideways and For you stays on top. Each band shows 4–6 items and ends
-in a "See all" link to `/items` with the matching sort or filter.
+in a plain "See all" link to `/items`, which opens with the visitor's saved filters as usual.
 
 ## Metrics
 
@@ -59,7 +59,7 @@ alone.
 
 For each skill in `skills-grid`, the item with the highest `creationProfit` whose
 `creationSpecs.requiredSkills` includes that skill. One aggregation with `$unwind` on
-`requiredSkills` and `$group` by skill name. Each tile links to `/items?skill=<skill>&sort=roi-value-desc`.
+`requiredSkills` and `$group` by skill name. Each tile links to `/items`.
 
 ### 5. Market pulse (PR 2)
 
@@ -144,6 +144,5 @@ querying live.
 ## Open questions
 
 - Is the 500-trades-per-day floor for movers right, or should it scale with price?
-- Should "See all" links open `/items` with the visitor's saved filters, or a clean view?
 - This session has no Mongo credentials, so thresholds and copy need a pass against real data once
   PR 1 runs on a deploy preview.
