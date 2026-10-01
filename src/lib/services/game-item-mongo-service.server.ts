@@ -7,6 +7,7 @@ import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
 import { skillSpellings } from '$lib/constants/skill-aliases';
+import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -54,6 +55,34 @@ export async function getNatureRunePrice(): Promise<number> {
         const price = rune?.highPrice ?? rune?.lowPrice ?? null;
         const resolved = typeof price === 'number' && price > 0 ? price : NATURE_RUNE_FALLBACK_PRICE;
         natureRunePriceCache = { price: resolved, readAt: Date.now() };
+        return resolved;
+    } catch {
+        return NATURE_RUNE_FALLBACK_PRICE;
+    }
+}
+
+let ironmanNatureRunePriceCache: { price: number; readAt: number } | null = null;
+
+/**
+ * What a nature rune costs an Ironman: the cheapest coin shop that sells one.
+ *
+ * An Ironman can't buy from the GE, so its price says nothing about what each alch costs them.
+ * Falls back to `NATURE_RUNE_FALLBACK_PRICE` when the shop data has no coin shop selling runes,
+ * since `populate-store-prices` only records shops that also buy from players.
+ */
+export async function getIronmanNatureRunePrice(): Promise<number> {
+    if (ironmanNatureRunePriceCache && Date.now() - ironmanNatureRunePriceCache.readAt < NATURE_RUNE_CACHE_MS) {
+        return ironmanNatureRunePriceCache.price;
+    }
+
+    try {
+        const rune = await OsrsboxItemModel.findOne({ id: NATURE_RUNE_ITEM_ID })
+            .select({ storePrices: 1 })
+            .lean<{ storePrices?: ShopSellTerms[] }>()
+            .exec();
+
+        const resolved = cheapestShopPrice(rune?.storePrices) ?? NATURE_RUNE_FALLBACK_PRICE;
+        ironmanNatureRunePriceCache = { price: resolved, readAt: Date.now() };
         return resolved;
     } catch {
         return NATURE_RUNE_FALLBACK_PRICE;
@@ -369,7 +398,9 @@ export async function getPaginatedGameItems(params?: {
     // cost — and with it their ROI — is zero for every survivor. Filtering on ROI as well would
     // leave nothing at all, so skip it there and let the sort fall through to profit instead.
     const filterMissingRoi = roiSort && !enforceSupplies;
-    const natureRunePrice = ironman && shouldComputeProfit ? await getNatureRunePrice() : NATURE_RUNE_FALLBACK_PRICE;
+    // Only Ironman values involve the rune, and an Ironman pays a shop for it, not the GE.
+    const natureRunePrice =
+        ironman && shouldComputeProfit ? await getIronmanNatureRunePrice() : NATURE_RUNE_FALLBACK_PRICE;
     const profitStages = shouldComputeProfit
         ? buildProfitPipeline(supplyMap, profitDrivenSort, enforceSupplies, filterMissingRoi, ironman, natureRunePrice)
         : [];

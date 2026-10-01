@@ -153,6 +153,12 @@ profile sees it first, and on phones as the first tab.
 - **Craft to alch:** the Ironman profit pipeline's top creations (alch value on both sides).
 - **Cheapest Ironman XP:** Cheapest XP, valued in alch value lost per XP.
 
+**Nothing an Ironman sees depends on the GE.** Every Ironman figure (the Ironman snapshot, For you
+with an Ironman profile, Almost unlocked, "Train X next", this corner, and `/items` in Ironman mode)
+values items by alch and charges each alch a nature rune at the cheapest coin-shop price
+(`getIronmanNatureRunePrice`), falling back to `NATURE_RUNE_FALLBACK_PRICE` when the shop data has
+none. Only a main's figures use the rune's GE price.
+
 An Ironman profile skips the last two here, because the page's main sections already show them valued
 the Ironman way.
 

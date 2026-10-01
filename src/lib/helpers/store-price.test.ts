@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { storeSalePrice, storeSalePrices, summarizeStoreSale } from './store-price';
+import { cheapestShopPrice, storeSalePrice, storeSalePrices, summarizeStoreSale } from './store-price';
 
 // Bob's Brilliant Axes: sellmultiplier=1000, buymultiplier=600, delta=20.
 const bobs = { buyMultiplier: 600, delta: 20 };
@@ -72,5 +72,33 @@ describe('summarizeStoreSale', () => {
 
     it('never reaches the floor when the price does not drop', () => {
         expect(summarizeStoreSale(200, { buyMultiplier: 600, delta: 0 }).salesToFloor).toBe(Number.POSITIVE_INFINITY);
+    });
+});
+
+describe('cheapestShopPrice', () => {
+    it('picks the cheapest coin shop that stocks the item', () => {
+        expect(
+            cheapestShopPrice([
+                { buyPrice: 380, stock: 50, currency: null },
+                { buyPrice: 300, stock: 20, currency: null },
+            ]),
+        ).toBe(300);
+    });
+
+    it('ignores shops that charge something other than coins', () => {
+        expect(cheapestShopPrice([{ buyPrice: 10, stock: 50, currency: 'Tokkul' }])).toBeNull();
+    });
+
+    it('ignores shops with no stock or no price', () => {
+        expect(
+            cheapestShopPrice([
+                { buyPrice: 100, stock: 0, currency: null },
+                { buyPrice: null, stock: 5, currency: null },
+            ]),
+        ).toBeNull();
+    });
+
+    it('is null without any shop data', () => {
+        expect(cheapestShopPrice(undefined)).toBeNull();
     });
 });

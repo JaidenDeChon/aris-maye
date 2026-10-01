@@ -4,6 +4,7 @@ import {
     buildPlayerSkillMatchExpression,
     buildPrimarySpecExpression,
     buildProfitPipeline,
+    getIronmanNatureRunePrice,
     getNatureRunePrice,
     getVisibilityQuery,
     normalizeSkillLevels,
@@ -46,7 +47,7 @@ const SNAPSHOT_COLLECTION = 'homepage-snapshots';
  * production's older code keeps writing, and the sections it adds would never appear. Each version
  * reads and writes its own document.
  */
-const SNAPSHOT_VERSION = 3;
+const SNAPSHOT_VERSION = 4;
 
 /** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
 const MEMORY_CACHE_MS = 60 * 1000;
@@ -548,18 +549,21 @@ async function computeShopSupplied(natureRunePrice: number): Promise<HomepageIte
 
 /** Builds every global homepage section from scratch. */
 export async function computeHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
-    const natureRunePrice = await getNatureRunePrice();
+    // Two rune prices: buying one to alch on the GE is a main's cost, and a shop's price is an
+    // Ironman's. Every Ironman figure, the corner included, uses the shop price so nothing an
+    // Ironman sees depends on the GE.
+    const [geRunePrice, ironmanRunePrice] = await Promise.all([getNatureRunePrice(), getIronmanNatureRunePrice()]);
     // The Ironman corner shows for everyone, so the Ironman view of creations is always needed. For
     // an Ironman snapshot it's also the main view, so it's only computed once.
-    const ironmanCreationPromise = computeCreationSections(true, natureRunePrice);
+    const ironmanCreationPromise = computeCreationSections(true, ironmanRunePrice);
     const [creation, ironmanCreation, alchPicks, marketPulse, shopSales, shopSupplied] = await Promise.all([
-        ironman ? ironmanCreationPromise : computeCreationSections(false, natureRunePrice),
+        ironman ? ironmanCreationPromise : computeCreationSections(false, geRunePrice),
         ironmanCreationPromise,
         // An Ironman can't buy or sell on the GE, so these aren't open to them.
-        ironman ? Promise.resolve([]) : computeAlchPicks(natureRunePrice),
+        ironman ? Promise.resolve([]) : computeAlchPicks(geRunePrice),
         ironman ? Promise.resolve(null) : computeMarketPulse(),
-        computeShopSales(natureRunePrice),
-        computeShopSupplied(natureRunePrice),
+        computeShopSales(ironmanRunePrice),
+        computeShopSupplied(ironmanRunePrice),
     ]);
 
     const ironmanCorner: HomepageIronmanCorner = {
@@ -569,7 +573,15 @@ export async function computeHomepageSnapshot(ironman: boolean): Promise<Homepag
         cheapXp: ironmanCreation.cheapXp,
     };
 
-    return { ironman, computedAt: Date.now(), natureRunePrice, ...creation, alchPicks, marketPulse, ironmanCorner };
+    return {
+        ironman,
+        computedAt: Date.now(),
+        natureRunePrice: ironman ? ironmanRunePrice : geRunePrice,
+        ...creation,
+        alchPicks,
+        marketPulse,
+        ironmanCorner,
+    };
 }
 
 type SnapshotDoc = { _id: string; snapshot: HomepageSnapshot };
@@ -672,7 +684,7 @@ export async function getAlmostUnlocked(
     const ahead = Object.fromEntries(
         Object.entries(levels).map(([skill, level]) => [skill, level + HOMEPAGE_ALMOST_UNLOCKED_LEVELS]),
     );
-    const natureRunePrice = ironman ? await getNatureRunePrice() : undefined;
+    const natureRunePrice = ironman ? await getIronmanNatureRunePrice() : undefined;
 
     const rows = await OsrsboxItemModel.aggregate<RawItem & { primarySpec?: RequirementSpec }>([
         { $match: baseCreationMatch(ironman) },

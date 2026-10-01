@@ -102,6 +102,7 @@ export type HomepageSnapshot = {
     ironman: boolean;
     /** Milliseconds since the epoch. */
     computedAt: number;
+    /** What one nature rune costs: its GE price for mains, the cheapest coin shop for Ironmen. */
     natureRunePrice: number;
     topProfit: HomepageItem[];
     topRoi: HomepageItem[];
