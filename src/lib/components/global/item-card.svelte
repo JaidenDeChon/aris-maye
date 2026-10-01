@@ -63,8 +63,8 @@
         if (item.tradeable_on_ge === false) return 'Not tradeable';
         return 'No recent trades';
     });
-    // Where an Ironman value came from. Shop names join this once shop data is scraped.
-    const valueSourceLabel = $derived(ironman && hasPrice ? 'High alch' : null);
+    // Where an Ironman value came from: alching it or selling it to a shop, whichever pays more.
+    const valueSourceLabel = $derived(ironman && hasPrice ? 'Alch or shop' : null);
     const priceTime = $derived(resolveDisplayTime(item));
     const profitValue = $derived(resolveProfit(item));
     const hasProfit = $derived(typeof profitValue === 'number' && Number.isFinite(profitValue));

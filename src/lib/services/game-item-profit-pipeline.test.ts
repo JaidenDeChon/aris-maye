@@ -56,4 +56,10 @@ describe('buildProfitPipeline pricing seams', () => {
     it('charges no GE tax under Ironman', () => {
         expect(stageText(true)).not.toContain('0.02');
     });
+
+    // An Ironman buys ingredients from shops and sells results to them, so shop prices count.
+    it('reads shop prices under Ironman only', () => {
+        expect(stageText(true)).toContain('storePrices');
+        expect(stageText(false)).not.toContain('storePrices.buyPrice');
+    });
 });

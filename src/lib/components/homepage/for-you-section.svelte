@@ -1,8 +1,7 @@
 <script lang="ts">
     import HomeItemRow from './home-item-row.svelte';
     import { Skeleton } from '$lib/components/ui/skeleton';
-    import { canUseGrandExchange } from '$lib/models/account-type';
-    import { getStoreRoot } from '$lib/stores/character-store.svelte';
+    import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { bankItemsStore, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { formatGpPerXp, formatGpShort, pickSkillToTrain, skillIcon, skillLabel } from '$lib/helpers/homepage';
     import { HOMEPAGE_ALMOST_UNLOCKED_LEVELS } from '$lib/constants/homepage';
@@ -23,7 +22,7 @@
     const activeCharacter = $derived(
         characterStore?.characters?.find((c) => String(c.id) === String(characterStore?.activeCharacter)),
     );
-    const ironman = $derived(!canUseGrandExchange(activeCharacter?.accountType));
+    const ironman = $derived(activeIsIronman());
     const skillLevels = $derived.by(() => {
         if (!activeCharacter) return null;
         const levels: Record<string, number> = {};

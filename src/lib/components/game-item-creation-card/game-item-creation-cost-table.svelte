@@ -4,8 +4,7 @@
     import { buildCostRows, totalCost, type CostRow, type CostRowKey } from '$lib/helpers/creation-cost-rows';
     import type { GameItemCreationSpecs, IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
-    import { getActiveAccountType, getStoreRoot } from '$lib/stores/character-store.svelte';
-    import { canUseGrandExchange } from '$lib/models/account-type';
+    import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { SvelteMap, SvelteSet } from 'svelte/reactivity';
     import { resolve } from '$app/paths';
 
@@ -44,7 +43,7 @@
     // Buy / Make choices the reader changed by hand. Anything untouched follows the account: an
     // Ironman can't buy from the Grand Exchange, so for them everything that can be made is made.
     const makeOverrides = new SvelteMap<CostRowKey, boolean>();
-    const makeByDefault = $derived(!canUseGrandExchange(getActiveAccountType()));
+    const makeByDefault = $derived(activeIsIronman());
 
     function shouldMake(key: CostRowKey): boolean {
         return makeOverrides.get(key) ?? makeByDefault;

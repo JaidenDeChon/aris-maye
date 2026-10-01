@@ -9,6 +9,7 @@
     import { resolve } from '$app/paths';
     import type { IGameItem } from '$lib/models/game-item';
     import { addRecentSearch, recentSearchesStore, type RecentSearchEntry } from '$lib/stores/recent-searches-store';
+    import IronmanModeToggle from './ironman-mode-toggle.svelte';
 
     let searchQuery = $state('');
     let searchDialogOpen = $state(false);
@@ -201,5 +202,7 @@
                 </Command.Root>
             </Dialog.Content>
         </Dialog.Root>
+
+        <IronmanModeToggle />
     </div>
 </header>

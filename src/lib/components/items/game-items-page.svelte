@@ -9,8 +9,8 @@
     import { page } from '$app/state';
     import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
     import type { SkillTreePage } from '$lib/constants/skill-tree-pages';
-    import { getStoreRoot } from '$lib/stores/character-store.svelte';
-    import { canUseGrandExchange, getAccountTypeOption } from '$lib/models/account-type';
+    import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
+    import { getAccountTypeOption } from '$lib/models/account-type';
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { filterItemsStore } from '$lib/stores/filter-items-by-player-levels';
     import { itemsPagePreferences } from '$lib/stores/items-page-preferences';
@@ -69,7 +69,7 @@
     const activeSkillLevels = $derived(normalizeSkillLevels(activeCharacter?.skillLevels, Boolean(activeCharacter)));
     // Pricing follows the active character rather than a page toggle, so browsing, an item page and
     // search cannot disagree about which prices the reader is looking at.
-    const ironmanMode = $derived(!canUseGrandExchange(activeCharacter?.accountType));
+    const ironmanMode = $derived(activeIsIronman());
     const activeAccountType = $derived(getAccountTypeOption(activeCharacter?.accountType));
     let skillFilterChecked = $state($filterItemsStore.filterItemsByPlayerLevels);
     const skillFilterEnabled = $derived(Boolean(skillFilterChecked && activeSkillLevels));

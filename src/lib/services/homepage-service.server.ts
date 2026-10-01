@@ -48,7 +48,7 @@ const SNAPSHOT_COLLECTION = 'homepage-snapshots';
  * production's older code keeps writing, and the sections it adds would never appear. Each version
  * reads and writes its own document.
  */
-const SNAPSHOT_VERSION = 4;
+const SNAPSHOT_VERSION = 5;
 
 /** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
 const MEMORY_CACHE_MS = 60 * 1000;

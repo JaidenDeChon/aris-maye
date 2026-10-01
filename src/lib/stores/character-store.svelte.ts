@@ -9,9 +9,20 @@ import {
 } from '$lib/models/account-type';
 import { LocalStorage } from '$lib/services/persisted-store.svelte';
 
+/**
+ * Ironman mode switched by hand, for the character it was switched for. Selecting a different
+ * character leaves it behind, so each character starts from its own account type again.
+ */
+interface IronmanModeOverride {
+    characterId: CharacterProfile['id'] | null;
+    ironman: boolean;
+}
+
 interface ICharacterStoreData {
     activeCharacter: undefined | CharacterProfile['id'];
     characters: CharacterProfile[];
+    /** Absent in profiles saved before the toggle existed. */
+    ironmanModeOverride?: IronmanModeOverride | null;
 }
 
 const _store = new LocalStorage<ICharacterStoreData>(LocalStorageStoreNames.CHARACTER_STORE, {
@@ -47,12 +58,39 @@ export function getActiveAccountType(): AccountType {
     return normalizeAccountType(active?.accountType);
 }
 
-/** Whether the active character may use the Grand Exchange, i.e. whether GE prices apply to them. */
-export function activeCanUseGrandExchange(): boolean {
-    return canUseGrandExchange(getActiveAccountType());
+/** Whether the active character's account type is an Ironman one, ignoring any toggle. */
+function accountTypeIsIronman(): boolean {
+    return !canUseGrandExchange(getActiveAccountType());
 }
 
-/** Whether the active character should be shown Ironman pricing. */
+function activeCharacterKey(): CharacterProfile['id'] | null {
+    const activeId = _store.current.activeCharacter;
+    return activeId === undefined || activeId === null ? null : activeId;
+}
+
+/**
+ * Whether the site is in Ironman mode: every price is an Ironman's (alch and shop values), and
+ * nothing from the Grand Exchange is shown.
+ *
+ * This is the one switch everything reads. It follows the active character's account type unless
+ * Ironman mode was toggled by hand for that character.
+ */
 export function activeIsIronman(): boolean {
-    return !activeCanUseGrandExchange();
+    const override = _store.current.ironmanModeOverride;
+    if (override && String(override.characterId) === String(activeCharacterKey())) return override.ironman;
+    return accountTypeIsIronman();
+}
+
+/** Whether GE prices apply, i.e. Ironman mode is off. */
+export function activeCanUseGrandExchange(): boolean {
+    return !activeIsIronman();
+}
+
+/**
+ * Turns Ironman mode on or off without changing the character. Matching the character's own
+ * account type clears the override rather than storing a redundant one.
+ */
+export function setIronmanMode(ironman: boolean): void {
+    _store.current.ironmanModeOverride =
+        ironman === accountTypeIsIronman() ? null : { characterId: activeCharacterKey(), ironman };
 }

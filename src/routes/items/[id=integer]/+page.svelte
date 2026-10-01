@@ -36,8 +36,7 @@
         getSuppliesForCharacter,
         updateSuppliesForCharacter,
     } from '$lib/stores/bank-items-store';
-    import { getStoreRoot, getActiveAccountType } from '$lib/stores/character-store.svelte';
-    import { canUseGrandExchange } from '$lib/models/account-type';
+    import { activeCanUseGrandExchange, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { NATURE_RUNE_FALLBACK_PRICE, alchemyValueAfterRune } from '$lib/constants/alchemy';
     import { toast } from 'svelte-sonner';
 
@@ -111,7 +110,7 @@
 
     // Which prices apply to the reader. Everything below branches on this one boolean rather than on
     // the account type, so the four Ironman variants cannot drift apart.
-    const usesGrandExchange = $derived(canUseGrandExchange(getActiveAccountType()));
+    const usesGrandExchange = $derived(activeCanUseGrandExchange());
     // The rune's price is the same whichever item is on screen, so a response that lands after the
     // reader has moved on is still the right answer and needs no per-navigation guard.
     let natureRuneHighPrice = $state<number | null>(null);
