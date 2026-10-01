@@ -6,6 +6,7 @@ import { NATURE_RUNE_FALLBACK_PRICE, NATURE_RUNE_ITEM_ID } from '$lib/constants/
 import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
+import { skillSpellings } from '$lib/constants/skill-aliases';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -1038,7 +1039,9 @@ export function normalizeSkillLevels(skillLevels?: PlayerSkillLevels | null): Pl
     const normalizedEntries = Object.entries(skillLevels).reduce<[string, number][]>((acc, [skill, level]) => {
         const numericLevel = Math.max(0, Math.floor(Number(level)));
         if (!Number.isFinite(numericLevel)) return acc;
-        acc.push([skill.toLowerCase(), numericLevel]);
+        // Recipe data can spell a skill the wiki's way ("runecraft"), so the level is filed under
+        // every spelling the skill-match expression might look it up by.
+        for (const spelling of skillSpellings(skill)) acc.push([spelling, numericLevel]);
         return acc;
     }, []);
 

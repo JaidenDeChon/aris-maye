@@ -52,13 +52,10 @@
 
 {#if snapshot}
     <div class="content-sizing flex flex-col gap-10 md:gap-14">
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-2 pt-8 md:gap-3 md:pt-0">
             <HomeStatStrip {snapshot} />
-            <p class="text-xs text-muted-foreground">
-                From hourly GE prices{updatedAgo ? `, worked out ${updatedAgo}` : ''}{snapshot.ironman
-                    ? '. Valued for Ironmen'
-                    : ''}.
-            </p>
+            <!-- Kept in the layout before the time is known so the page doesn't shift when it appears. -->
+            <p class="min-h-4 text-xs text-muted-foreground">{updatedAgo ?? ''}</p>
         </div>
 
         <ForYouSection />

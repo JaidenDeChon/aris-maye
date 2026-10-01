@@ -27,4 +27,10 @@ describe('findShortfalls', () => {
             { skill: 'herblore', need: 3, have: 0 },
         ]);
     });
+
+    it("matches the wiki's Runecraft to the player's runecrafting level", () => {
+        const spec = { requiredSkills: [{ skillName: 'Runecraft', skillLevel: 44 }] };
+        expect(findShortfalls(spec, { runecrafting: 40 })).toEqual([{ skill: 'runecrafting', need: 44, have: 40 }]);
+        expect(findShortfalls(spec, { runecrafting: 50 })).toEqual([]);
+    });
 });

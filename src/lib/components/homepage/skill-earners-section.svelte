@@ -9,11 +9,7 @@
     const { snapshot, compact = false }: { snapshot: HomepageSnapshot; compact?: boolean } = $props();
 </script>
 
-<HomeBand
-    title="Top earner per skill"
-    blurb="The most profitable thing each skill can make at today's prices, at any level."
-    {compact}
->
+<HomeBand title="Top earner per skill" blurb="Most profitable items to make, by skill" {compact}>
     {#if snapshot.skillEarners.length}
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {#each snapshot.skillEarners as earner (earner.skill)}

@@ -36,9 +36,14 @@
     });
 </script>
 
+<!--
+    On phones the strip scrolls sideways and bleeds past the page padding, so the next card peeks in.
+    `scroll-px-8` makes snapping respect that padding, so the first card lines up with the page
+    content instead of snapping to the screen edge.
+-->
 {#if tiles.length}
     <div
-        class="-mx-8 flex snap-x gap-3 overflow-x-auto px-8 pb-1 [contain:inline-size] md:mx-0 md:grid md:overflow-visible md:px-0"
+        class="-mx-8 flex snap-x scroll-px-8 gap-3 overflow-x-auto px-8 pt-1 pb-4 [contain:inline-size] md:mx-0 md:grid md:scroll-px-0 md:overflow-visible md:px-0 md:pb-1"
         style:grid-template-columns={`repeat(${tiles.length}, minmax(0, 1fr))`}
     >
         {#each tiles as tile (tile.label)}

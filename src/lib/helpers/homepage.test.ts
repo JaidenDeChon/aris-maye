@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { formatGpPerXp, formatGpShort, formatRoi, pickSkillToTrain } from './homepage';
+import { formatGpPerXp, formatGpShort, formatRoi, pickSkillToTrain, skillIcon, skillLabel } from './homepage';
 import type { HomepageAlmostUnlocked, HomepageItem } from '$lib/models/homepage';
 
 function item(id: number, creationProfit: number): HomepageItem {
@@ -87,5 +87,12 @@ describe('pickSkillToTrain', () => {
 
     it('returns null when nothing qualifies', () => {
         expect(pickSkillToTrain([])).toBeNull();
+    });
+});
+
+describe('skillIcon', () => {
+    it("finds the Runecrafting icon for the wiki's Runecraft", () => {
+        expect(skillIcon('Runecraft')).toBe('/skill-images/runecrafting.png');
+        expect(skillLabel('runecraft')).toBe('Runecrafting');
     });
 });

@@ -16,6 +16,7 @@ import {
     HOMEPAGE_MIN_ROI_PROFIT,
     HOMEPAGE_SNAPSHOT_MAX_AGE_MS,
 } from '$lib/constants/homepage';
+import { canonicalSkill } from '$lib/constants/skill-aliases';
 import type {
     HomepageAlchPick,
     HomepageAlmostUnlocked,
@@ -185,17 +186,28 @@ async function computeCreationSections(ironman: boolean, natureRunePrice: number
         },
     ] as unknown as PipelineStage[]).allowDiskUse(true);
 
-    const bySkill = <T extends { _id: string }>(rows: T[]) =>
-        rows.filter((row) => typeof row._id === 'string' && row._id).sort((a, b) => a._id.localeCompare(b._id));
+    // Groups come back keyed by however the recipe spelled the skill, so two spellings of one skill
+    // ("runecraft", "runecrafting") are merged, keeping whichever row `better` prefers.
+    const bySkill = <T extends { _id: string }>(rows: T[], better: (a: T, b: T) => boolean) => {
+        const merged = new Map<string, T>();
+        for (const row of rows) {
+            const skill = canonicalSkill(row._id);
+            if (!skill) continue;
+            const existing = merged.get(skill);
+            if (!existing || better(row, existing)) merged.set(skill, { ...row, _id: skill });
+        }
+        return Array.from(merged.values()).sort((a, b) => a._id.localeCompare(b._id));
+    };
 
     return {
         topProfit: (facets?.topProfit ?? []).map(toHomepageItem),
         topRoi: (facets?.topRoi ?? []).map(toHomepageItem),
         topGpPerLimit: (facets?.topGpPerLimit ?? []).map(toHomepageItem),
-        skillEarners: bySkill(facets?.skillEarners ?? []).map(
-            (row): HomepageSkillEarner => ({ skill: row._id, item: toHomepageItem(row.item) }),
-        ),
-        cheapXp: bySkill(facets?.cheapXp ?? []).map(
+        skillEarners: bySkill(
+            facets?.skillEarners ?? [],
+            (a, b) => (a.item.creationProfit ?? 0) > (b.item.creationProfit ?? 0),
+        ).map((row): HomepageSkillEarner => ({ skill: row._id, item: toHomepageItem(row.item) })),
+        cheapXp: bySkill(facets?.cheapXp ?? [], (a, b) => a.gpPerXp < b.gpPerXp).map(
             (row): HomepageCheapXp => ({
                 skill: row._id,
                 item: toHomepageItem(row.item),
@@ -300,7 +312,7 @@ export function findShortfalls(
 
     const shortfalls = new Map<string, HomepageShortfall>();
     for (const { skill, level } of requirements) {
-        const key = skill.toLowerCase();
+        const key = canonicalSkill(skill);
         if (!key) continue;
         const have = levels[key] ?? 0;
         if (level <= have) continue;

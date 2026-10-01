@@ -23,9 +23,7 @@
     );
 
     const blurbs = $derived<Record<Ranking, string>>({
-        profit: snapshot.ironman
-            ? 'What each one alchs for, less the alch value of its ingredients and a nature rune.'
-            : 'What each one makes you after buying the ingredients and paying the GE tax.',
+        profit: 'Most profitable items to make',
         roi: `Profit as a share of what the ingredients cost. Only items making at least ${HOMEPAGE_MIN_ROI_PROFIT} gp each count.`,
         limit: 'Profit times how many you can make before an ingredient hits its 4-hour GE buy limit.',
     });

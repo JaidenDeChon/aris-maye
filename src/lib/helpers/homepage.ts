@@ -1,3 +1,4 @@
+import { canonicalSkill } from '$lib/constants/skill-aliases';
 import type { HomepageAlmostUnlocked, HomepageItem } from '$lib/models/homepage';
 
 /**
@@ -41,12 +42,13 @@ export function formatGpPerXp(value: number | null | undefined): string {
 
 /** A skill key such as "runecrafting" as a heading: "Runecrafting". */
 export function skillLabel(skill: string): string {
-    return skill.charAt(0).toUpperCase() + skill.slice(1);
+    const name = canonicalSkill(skill);
+    return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /** The skill's icon in `static/skill-images`. */
 export function skillIcon(skill: string): string {
-    return `/skill-images/${skill.toLowerCase()}.png`;
+    return `/skill-images/${canonicalSkill(skill)}.png`;
 }
 
 export type SkillToTrain = {
