@@ -6,6 +6,7 @@
     import MakeNowSection from './make-now-section.svelte';
     import SkillEarnersSection from './skill-earners-section.svelte';
     import AlchXpSection from './alch-xp-section.svelte';
+    import HomeSectionsSkeleton from './home-sections-skeleton.svelte';
     import { activeIsIronman } from '$lib/stores/character-store.svelte';
     import { timeSince } from '$lib/helpers/time-since';
     import type { HomepageSnapshot } from '$lib/models/homepage';
@@ -14,25 +15,43 @@
      * Everything between the hero and the FAQ.
      *
      * On wide screens each section is its own band. On phones the same sections fold into one
-     * tabbed card so the page doesn't scroll forever. The server renders the sections valued for a
-     * main; an Ironman profile swaps in the Ironman values once the browser knows about it.
+     * tabbed card so the page doesn't scroll forever.
+     *
+     * The server sends the sections valued for a main when it has them quickly. When it doesn't,
+     * the page arrives with a skeleton and the browser fetches them. An Ironman profile always
+     * fetches its own values, with the skeleton up until they land, so a main's numbers never
+     * flash past.
      */
-    const { snapshot: mainSnapshot }: { snapshot: HomepageSnapshot | null } = $props();
+    const { snapshot: serverSnapshot }: { snapshot: HomepageSnapshot | null } = $props();
 
+    let fetchedMain = $state<HomepageSnapshot | null>(null);
     let ironmanSnapshot = $state<HomepageSnapshot | null>(null);
-    const ironman = $derived(activeIsIronman());
-    const snapshot = $derived(ironman && ironmanSnapshot ? ironmanSnapshot : mainSnapshot);
+    let failed = $state(false);
+    let mounted = $state(false);
+    onMount(() => (mounted = true));
+
+    // Before mount the profile isn't readable yet, so the server's render (a main's view) stands.
+    const ironman = $derived(mounted && activeIsIronman());
+    const mainSnapshot = $derived(serverSnapshot ?? fetchedMain);
+    const snapshot = $derived(ironman ? ironmanSnapshot : mainSnapshot);
 
     $effect(() => {
-        if (!ironman || ironmanSnapshot) return;
+        if (!mounted || snapshot || failed) return;
+        const wantIronman = ironman;
         const controller = new AbortController();
-        fetch('/api/homepage?ironman=1', { signal: controller.signal })
-            .then((response) => (response.ok ? (response.json() as Promise<HomepageSnapshot>) : null))
+        fetch(wantIronman ? '/api/homepage?ironman=1' : '/api/homepage', { signal: controller.signal })
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json() as Promise<HomepageSnapshot>;
+            })
             .then((data) => {
-                if (data) ironmanSnapshot = data;
+                if (wantIronman) ironmanSnapshot = data;
+                else fetchedMain = data;
             })
             .catch((error) => {
-                if (error?.name !== 'AbortError') console.error('Failed to load Ironman homepage data', error);
+                if (error?.name === 'AbortError') return;
+                console.error('Failed to load homepage data', error);
+                failed = true;
             });
         return () => controller.abort();
     });
@@ -45,21 +64,26 @@
     let activeTab = $state('make');
 
     // Worked out in the browser so the server's clock and time zone never leak into the page.
-    let mounted = $state(false);
-    onMount(() => (mounted = true));
     const updatedAgo = $derived(mounted && snapshot ? timeSince(Math.floor(snapshot.computedAt / 1000)) : null);
 </script>
 
-{#if snapshot}
-    <div class="content-sizing flex flex-col gap-10 md:gap-14">
+<!-- If the data can't be loaded at all, the sections step aside and the hero and FAQ carry on. -->
+<div class="content-sizing flex flex-col gap-10 md:gap-14">
+    {#if snapshot || !failed}
         <div class="flex flex-col gap-2 pt-8 md:gap-3 md:pt-0">
-            <HomeStatStrip {snapshot} />
-            <!-- Kept in the layout before the time is known so the page doesn't shift when it appears. -->
-            <p class="min-h-4 text-xs text-muted-foreground">{updatedAgo ?? ''}</p>
+            {#if snapshot}
+                <HomeStatStrip {snapshot} />
+                <!-- Kept in the layout before the time is known so the page doesn't shift when it appears. -->
+                <p class="min-h-4 text-xs text-muted-foreground">{updatedAgo ?? ''}</p>
+            {:else}
+                <HomeSectionsSkeleton part="strip" />
+            {/if}
         </div>
+    {/if}
 
-        <ForYouSection />
+    <ForYouSection />
 
+    {#if snapshot}
         <!-- Wide screens: one band per section. -->
         <div class="hidden flex-col gap-14 md:flex">
             <MakeNowSection {snapshot} />
@@ -80,5 +104,7 @@
                 <Tabs.Content value="xp"><AlchXpSection {snapshot} compact /></Tabs.Content>
             </Tabs.Root>
         </div>
-    </div>
-{/if}
+    {:else if !failed}
+        <HomeSectionsSkeleton part="bands" />
+    {/if}
+</div>

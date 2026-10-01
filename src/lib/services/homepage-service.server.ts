@@ -29,6 +29,12 @@ import type {
 
 const SNAPSHOT_COLLECTION = 'homepage-snapshots';
 
+/** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
+const MEMORY_CACHE_MS = 60 * 1000;
+
+const memoryCache = new Map<string, { snapshot: HomepageSnapshot; readAt: number }>();
+const rebuildsInFlight = new Map<string, Promise<HomepageSnapshot>>();
+
 /** The fields a homepage tile reads, kept small because a snapshot holds a few dozen of them. */
 const ITEM_PROJECTION = {
     _id: 0,
@@ -274,21 +280,48 @@ function snapshotCollection() {
 /** Rebuilds a snapshot and stores it. The hourly price job calls this so visitors rarely wait. */
 export async function refreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
     const snapshot = await computeHomepageSnapshot(ironman);
-    await snapshotCollection().updateOne({ _id: ironman ? 'ironman' : 'ge' }, { $set: { snapshot } }, { upsert: true });
+    await snapshotCollection().updateOne({ _id: snapshotKey(ironman) }, { $set: { snapshot } }, { upsert: true });
+    memoryCache.set(snapshotKey(ironman), { snapshot, readAt: Date.now() });
     return snapshot;
 }
 
+/** Rebuilds a snapshot once, however many requests ask for it at the same time. */
+function rebuildOnce(ironman: boolean): Promise<HomepageSnapshot> {
+    const key = snapshotKey(ironman);
+    const inFlight = rebuildsInFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const rebuild = refreshHomepageSnapshot(ironman).finally(() => rebuildsInFlight.delete(key));
+    rebuildsInFlight.set(key, rebuild);
+    return rebuild;
+}
+
+function snapshotKey(ironman: boolean): string {
+    return ironman ? 'ironman' : 'ge';
+}
+
 /**
- * The global homepage sections, from the cache when it's fresh.
+ * The global homepage sections, as fast as they can be had.
  *
- * A stale or missing snapshot is rebuilt on the spot, so the page still works if the hourly job
- * failed or hasn't run yet.
+ * - A snapshot this instance read in the last minute comes straight from memory.
+ * - Otherwise it's read from Mongo. A stale one is still returned straight away, and a rebuild
+ *   starts in the background, so a visitor never waits on the expensive aggregation just because
+ *   the hourly job hasn't run.
+ * - Only when there's no snapshot at all does the caller wait for one to be built.
  */
 export async function getHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
-    const cached = await snapshotCollection().findOne({ _id: ironman ? 'ironman' : 'ge' });
-    const age = cached ? Date.now() - cached.snapshot.computedAt : Infinity;
-    if (cached && age < HOMEPAGE_SNAPSHOT_MAX_AGE_MS) return cached.snapshot;
-    return refreshHomepageSnapshot(ironman);
+    const key = snapshotKey(ironman);
+    const remembered = memoryCache.get(key);
+    if (remembered && Date.now() - remembered.readAt < MEMORY_CACHE_MS) return remembered.snapshot;
+
+    const cached = await snapshotCollection().findOne({ _id: key });
+    if (!cached) return rebuildOnce(ironman);
+
+    memoryCache.set(key, { snapshot: cached.snapshot, readAt: Date.now() });
+    if (Date.now() - cached.snapshot.computedAt >= HOMEPAGE_SNAPSHOT_MAX_AGE_MS) {
+        rebuildOnce(ironman).catch((error) => console.error('Background homepage rebuild failed:', error));
+    }
+    return cached.snapshot;
 }
 
 /**
