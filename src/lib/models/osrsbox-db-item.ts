@@ -147,6 +147,11 @@ export interface IOsrsboxItem {
     wiki_page_title?: string | null;
     wiki_version?: string | null;
     storePrices?: GameItemStorePrice[];
+    /** Trade volume kept by the hourly price job. See `helpers/volume-history.ts`. */
+    volume1h?: number;
+    volume24h?: number;
+    priceChange24h?: number | null;
+    volumeHistory?: { t: number; v: number; mid: number | null }[];
     equipment: Record<string, unknown> | null;
     weapon: Record<string, unknown> | null;
     creationSpecs?: GameItemCreationSpecs[];

@@ -18,6 +18,12 @@ export type HomepageItem = {
     craftsPerLimit: number | null;
     /** Profit times `craftsPerLimit`: the most a main can clear from it every 4 hours. */
     gpPerLimit: number | null;
+    /** Traded on the GE in the last hour. */
+    volume1h: number | null;
+    /** Traded on the GE in the last day. */
+    volume24h: number | null;
+    /** Price change over the last day as a ratio (0.05 is +5%). */
+    priceChange24h: number | null;
 };
 
 /** The most profitable thing to make that uses a given skill. */
@@ -46,6 +52,20 @@ export type HomepageAlchPick = {
     highalch: number;
 };
 
+/** What's trading on the GE. See "Market pulse" in `docs/homepage-plan.md`. */
+export type HomepageMarketPulse = {
+    /**
+     * How many hours of trade history the hourly job has collected, up to a day. Most traded needs
+     * one; risers and fallers need a day, and show a "coming soon" state until then.
+     */
+    historyHours: number;
+    /** Hours of history risers and fallers need. */
+    hoursNeeded: number;
+    mostTraded: HomepageItem[];
+    risers: HomepageItem[];
+    fallers: HomepageItem[];
+};
+
 /** Every global homepage section, computed in one go and cached. */
 export type HomepageSnapshot = {
     ironman: boolean;
@@ -58,6 +78,8 @@ export type HomepageSnapshot = {
     skillEarners: HomepageSkillEarner[];
     cheapXp: HomepageCheapXp[];
     alchPicks: HomepageAlchPick[];
+    /** Null for Ironmen, who can't trade on the GE. */
+    marketPulse: HomepageMarketPulse | null;
 };
 
 /** A skill the player is short in for an item they have almost unlocked. */
