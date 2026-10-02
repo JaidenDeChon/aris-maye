@@ -202,6 +202,13 @@ hour's data traded nothing and gets a zero entry. If the `/1h` fetch fails, the 
 prices alone. The numbers live in `src/lib/constants/market.ts`, which has no imports so the job's bundler
 can read it.
 
+**Deploy previews.** Netlify only runs scheduled functions for production, and previews read
+`osrsbox-dev` (so a rebuild there can be checked before `promote-db` copies it to prod). Set
+`PRICE_SYNC_EXTRA_DBS=osrsbox-dev` on the site and the job writes the same prices and volume to dev
+after prod, from the one wiki fetch. One database takes about 5 seconds to write, so two stay well
+inside the 30-second limit on scheduled functions. A failure on an extra database is logged and
+doesn't fail the run.
+
 There's an index on `{ tradeable_on_ge: 1, volume1h: -1 }`. The volume fields could also power new sorts
 on `/items` later.
 
