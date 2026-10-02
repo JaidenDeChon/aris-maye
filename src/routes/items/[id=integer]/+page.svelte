@@ -440,7 +440,7 @@
     }
 </script>
 
-<div class="content-sizing pt-6">
+<div class="content-sizing pt-6 pb-10">
     <Dialog.Root bind:open={bankDialogOpen}>
         <Dialog.Content>
             {#if bankDialogMode === 'add'}
@@ -679,10 +679,15 @@
                 {#if showGrandExchangeCard}
                     <section
                         class="border rounded-lg bg-card shadow-sm overflow-hidden {collapseGrandExchangeCard
-                            ? 'lg:order-last opacity-80'
+                            ? `lg:order-last opacity-80 ${grandExchangeOpen ? '' : 'self-start'}`
                             : ''}"
                     >
-                        <div class="flex items-start justify-between gap-3 p-4 border-b">
+                        <div
+                            class="flex items-start justify-between gap-3 p-4 {collapseGrandExchangeCard &&
+                            !grandExchangeOpen
+                                ? ''
+                                : 'border-b'}"
+                        >
                             <div class="flex items-center gap-3">
                                 <img
                                     src="/other-images/grand-exchange.png"
@@ -741,10 +746,7 @@
                 <section class="border rounded-lg bg-card shadow-sm overflow-hidden">
                     <div class="flex items-center gap-3 p-4 border-b">
                         <img src="/spell-images/high-level-alchemy.png" alt="" class="h-7 w-7 drop-shadow shrink-0" />
-                        <div>
-                            <h3 class="text-lg font-semibold leading-tight">Alchemy and shops</h3>
-                            <p class="text-xs text-muted-foreground">Fixed values set by the game</p>
-                        </div>
+                        <h3 class="text-lg font-semibold leading-tight">Alchemy and shops</h3>
                     </div>
                     <div class="grid grid-cols-2 gap-3 p-4">
                         <StatTile label="High alch" value={formatValue(gameItem?.highalch)}>
