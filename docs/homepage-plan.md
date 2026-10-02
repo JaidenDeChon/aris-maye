@@ -71,13 +71,14 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 ### 5. Market pulse (PR 2)
 
 - **Most traded:** `volume1h` (high + low volume), with the GP value traded shown as a secondary number.
-- **Risers / fallers:** `priceChange24h = (latestMid − firstMid) / firstMid`, comparing the average price
-  of the first and latest hours in the item's day of history that had trades. Hourly averages are
-  steadier than single latest prices. Only items that pass the movers floor below count.
-- **Before there's enough data:** the band still shows. With no history at all it's one "Coming soon"
-  card. Once there's an hour, Most traded fills in, and risers and fallers show a "Coming soon" card with
-  a progress bar ("7 of 23 hours of trade data collected") until the history spans 23 hours
-  (`PRICE_CHANGE_MIN_HOURS`, one short of a day so a single missed run doesn't hide them).
+- **Risers / fallers:** `priceChange24h` compares the median hourly price of the last 3 traded hours
+  (`MOVERS_PRICE_HOURS`) with the first 3 in the item's day of history. Each hour's price is the
+  wiki's average buy and sell prices weighted by how many of each traded, so a few insta-buys at a
+  silly price don't swamp a hundred ordinary sales, and the median means one odd hour at either end
+  can't set the change. Only items that pass the movers floor below count.
+- **History is backfilled.** Each run fills in any of the last 24 hours the database is missing from
+  `/1h?timestamp=`, so a new database has a full day after one run, and a skipped hour or an outage
+  catches up on the next. The band is hidden only before the job has stored anything at all.
 - Mains only. Ironmen can't trade on the GE, so the band and its tiles are left out for them.
 - **Read live.** The page fetches the band from `/api/homepage/market-pulse`, which queries the items
   directly with a one-minute cache, rather than relying on the snapshot. It's cheap to work out, and
@@ -92,8 +93,11 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 
 An item counts as a mover only when both of these hold:
 
-- **GP traded per day ≥ 10,000,000**, where GP traded is `volume24h × mid`.
+- **GP traded per day ≥ 10,000,000**, where GP traded is `volume24h × typicalPrice24h`, the median of
+  the day's hourly prices. The latest high and low aren't used, because one odd trade sets them.
 - **Trades per day ≥ 10**, i.e. `volume24h`.
+- **Traded in at least 18 of the day's hours** (`MOVERS_MIN_TRADED_HOURS`), so a handful of trades
+  doesn't set an occasional item's change.
 
 **Why a floor at all.** Rarely traded items swing wildly. If a niche item sells 3 times a day and
 one player dumps it 60% under the usual price, it would top the fallers list. That's one impatient
@@ -197,7 +201,12 @@ volume24h: number; // sum of volumeHistory.v
 priceChange24h: number | null; // null until the history spans PRICE_CHANGE_MIN_HOURS
 ```
 
-A second run in the same hour replaces that hour instead of counting it twice. An item missing from the
+`VOLUME_HISTORY_VERSION` is stored in the database's metadata. When a change to how an hour is
+recorded bumps it, the next run fetches the whole day again, so old and new hours never mix.
+
+A second run in the same hour replaces that hour instead of counting it twice. Any of the last 24
+hours the database is missing are fetched by timestamp (6 at a time, about half a second for a full
+day) and slotted in, with each hour fetched once however many databases the run updates. An item missing from the
 hour's data traded nothing and gets a zero entry. If the `/1h` fetch fails, the run logs it and updates
 prices alone. The numbers live in `src/lib/constants/market.ts`, which has no imports so the job's bundler
 can read it.

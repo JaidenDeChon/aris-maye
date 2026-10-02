@@ -139,6 +139,8 @@ export const osrsboxItemSchema: Schema<OsrsboxItemDocument> = new Schema(
         volume1h: { type: Number, required: false },
         volume24h: { type: Number, required: false },
         priceChange24h: { type: Number, default: undefined },
+        typicalPrice24h: { type: Number, default: undefined },
+        tradedHours24h: { type: Number, default: undefined },
         volumeHistory: {
             type: [{ _id: false, t: Number, v: Number, mid: { type: Number, default: null } }],
             default: undefined,

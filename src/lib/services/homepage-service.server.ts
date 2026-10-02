@@ -13,8 +13,8 @@ import {
 } from '$lib/services/game-item-mongo-service.server';
 import {
     MOVERS_MIN_GP_PER_DAY,
+    MOVERS_MIN_TRADED_HOURS,
     MOVERS_MIN_TRADES_PER_DAY,
-    PRICE_CHANGE_MIN_HOURS,
     VOLUME_HISTORY_HOURS,
 } from '$lib/constants/market';
 import {
@@ -75,6 +75,7 @@ const ITEM_PROJECTION = {
     volume1h: 1,
     volume24h: 1,
     priceChange24h: 1,
+    typicalPrice24h: 1,
 } as const;
 
 type RawItem = {
@@ -93,6 +94,7 @@ type RawItem = {
     volume1h?: number | null;
     volume24h?: number | null;
     priceChange24h?: number | null;
+    typicalPrice24h?: number | null;
 };
 
 function toHomepageItem(raw: RawItem): HomepageItem {
@@ -113,6 +115,7 @@ function toHomepageItem(raw: RawItem): HomepageItem {
         volume1h: num(raw.volume1h),
         volume24h: num(raw.volume24h),
         priceChange24h: num(raw.priceChange24h),
+        typicalPrice24h: num(raw.typicalPrice24h),
     };
 }
 
@@ -300,11 +303,9 @@ async function computeMarketPulse(): Promise<HomepageMarketPulse> {
     const liquid = {
         priceChange24h: { $ne: null },
         volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
+        tradedHours24h: { $gte: MOVERS_MIN_TRADED_HOURS },
         $expr: {
-            $gte: [
-                { $multiply: ['$volume24h', { $ifNull: [{ $avg: ['$highPrice', '$lowPrice'] }, 0] }] },
-                MOVERS_MIN_GP_PER_DAY,
-            ],
+            $gte: [{ $multiply: ['$volume24h', { $ifNull: ['$typicalPrice24h', 0] }] }, MOVERS_MIN_GP_PER_DAY],
         },
     };
 
@@ -345,7 +346,6 @@ async function computeMarketPulse(): Promise<HomepageMarketPulse> {
 
     return {
         historyHours: Math.min(VOLUME_HISTORY_HOURS, facets?.historyHours?.[0]?.hours ?? 0),
-        hoursNeeded: PRICE_CHANGE_MIN_HOURS,
         mostTraded: (facets?.mostTraded ?? []).map(toHomepageItem),
         risers: (facets?.risers ?? []).map(toHomepageItem),
         fallers: (facets?.fallers ?? []).map(toHomepageItem),

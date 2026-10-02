@@ -151,6 +151,10 @@ export interface IOsrsboxItem {
     volume1h?: number;
     volume24h?: number;
     priceChange24h?: number | null;
+    /** The median of the day's hourly prices. Values a day's trading for the movers floor. */
+    typicalPrice24h?: number | null;
+    /** How many of the day's hours the item traded in. */
+    tradedHours24h?: number;
     volumeHistory?: { t: number; v: number; mid: number | null }[];
     equipment: Record<string, unknown> | null;
     weapon: Record<string, unknown> | null;

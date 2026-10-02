@@ -106,7 +106,12 @@
     });
 
     // Ironmen can't trade on the GE, so their snapshot has no Market pulse and the band stays hidden.
-    const pulse = $derived(snapshot && !snapshot.ironman ? (livePulse ?? snapshot.marketPulse ?? null) : null);
+    // It also stays hidden before the hourly job has stored any trade history.
+    const pulse = $derived.by(() => {
+        if (!snapshot || snapshot.ironman) return null;
+        const current = livePulse ?? snapshot.marketPulse ?? null;
+        return current && current.historyHours > 0 ? current : null;
+    });
 
     // Snapshots cached before the Ironman corner existed don't have one.
     const corner = $derived(snapshot?.ironmanCorner ?? null);

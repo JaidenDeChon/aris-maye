@@ -24,6 +24,8 @@ export type HomepageItem = {
     volume24h: number | null;
     /** Price change over the last day as a ratio (0.05 is +5%). */
     priceChange24h: number | null;
+    /** The median of the day's hourly GE prices. Steadier than the latest high and low. */
+    typicalPrice24h: number | null;
 };
 
 /** The most profitable thing to make that uses a given skill. */
@@ -55,12 +57,10 @@ export type HomepageAlchPick = {
 /** What's trading on the GE. See "Market pulse" in `docs/homepage-plan.md`. */
 export type HomepageMarketPulse = {
     /**
-     * How many hours of trade history the hourly job has collected, up to a day. Most traded needs
-     * one; risers and fallers need a day, and show a "coming soon" state until then.
+     * How many hours of trade history the hourly job has stored, up to a day. The band is hidden
+     * while this is 0, before the job has run at all.
      */
     historyHours: number;
-    /** Hours of history risers and fallers need. */
-    hoursNeeded: number;
     mostTraded: HomepageItem[];
     risers: HomepageItem[];
     fallers: HomepageItem[];
