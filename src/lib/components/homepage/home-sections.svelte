@@ -12,7 +12,7 @@
     import { activeIsIronman } from '$lib/stores/character-store.svelte';
     import { timeSince } from '$lib/helpers/time-since';
     import { HOMEPAGE_SNAPSHOT_MAX_AGE_MS } from '$lib/constants/homepage';
-    import type { HomepageSnapshot } from '$lib/models/homepage';
+    import type { HomepageMarketPulse, HomepageSnapshot } from '$lib/models/homepage';
 
     /**
      * Everything between the hero and the FAQ.
@@ -87,8 +87,26 @@
             .catch((error) => console.error('Failed to refresh homepage data', error));
     });
 
-    // Snapshots cached before Market pulse existed have no `marketPulse` at all.
-    const pulse = $derived(snapshot?.marketPulse ?? null);
+    // Market pulse is read live rather than from the snapshot, so its hour count is never older
+    // than a minute. Until that lands, the snapshot's copy stands in.
+    let livePulse = $state<HomepageMarketPulse | null>(null);
+    $effect(() => {
+        if (!mounted || ironman || livePulse) return;
+        const controller = new AbortController();
+        fetch('/api/homepage/market-pulse', { signal: controller.signal })
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json() as Promise<HomepageMarketPulse>;
+            })
+            .then((data) => (livePulse = data))
+            .catch((error) => {
+                if (error?.name !== 'AbortError') console.error('Failed to load Market pulse', error);
+            });
+        return () => controller.abort();
+    });
+
+    // Ironmen can't trade on the GE, so their snapshot has no Market pulse and the band stays hidden.
+    const pulse = $derived(snapshot && !snapshot.ironman ? (livePulse ?? snapshot.marketPulse ?? null) : null);
 
     // Snapshots cached before the Ironman corner existed don't have one.
     const corner = $derived(snapshot?.ironmanCorner ?? null);
@@ -116,7 +134,7 @@
     {#if snapshot || !failed}
         <div class="flex flex-col gap-2 pt-8 md:gap-3 md:pt-12">
             {#if snapshot}
-                <HomeStatStrip {snapshot} />
+                <HomeStatStrip {snapshot} {pulse} />
                 <!-- Kept in the layout before the time is known so the page doesn't shift when it appears. -->
                 <p class="min-h-4 text-xs text-muted-foreground">{updatedAgo ?? ''}</p>
             {:else}

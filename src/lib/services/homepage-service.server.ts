@@ -1,5 +1,6 @@
 import mongoose, { type PipelineStage } from 'mongoose';
 import { OsrsboxItemModel } from '$lib/models/mongo-schemas/osrsbox-db-item-schema';
+import { CollectionMetadataModel } from '$lib/models/mongo-schemas/collection-metadata-schema';
 import {
     buildPlayerSkillMatchExpression,
     buildPrimarySpecExpression,
@@ -686,6 +687,56 @@ export async function getFreshHomepageSnapshot(ironman: boolean): Promise<Homepa
             .catch(() => {});
         throw error;
     }
+}
+
+let pulseCache: { pulse: HomepageMarketPulse; readAt: number } | null = null;
+
+/**
+ * Market pulse straight from the items, cached for a minute.
+ *
+ * The homepage reads this on its own instead of from the snapshot: it's cheap to work out, and it
+ * shouldn't sit at an old hour count just because the expensive snapshot hasn't been rebuilt.
+ */
+export async function getMarketPulse(): Promise<HomepageMarketPulse> {
+    if (pulseCache && Date.now() - pulseCache.readAt < MEMORY_CACHE_MS) return pulseCache.pulse;
+    const pulse = await computeMarketPulse();
+    pulseCache = { pulse, readAt: Date.now() };
+    return pulse;
+}
+
+/** Where the homepage's data stands, for checking a deploy from the browser. */
+export type HomepageStatus = {
+    /** When the hourly job last wrote prices, in milliseconds since the epoch. */
+    pricesUpdatedAt: number | null;
+    /** How many GE items have any trade history stored. */
+    itemsWithVolumeHistory: number;
+    /** The longest trade history any item has, in hours. */
+    historyHours: number;
+    /** When each snapshot this code reads was built, and whether a rebuild is claimed. */
+    snapshots: Record<string, { computedAt: number | null; rebuildingAt: number | null }>;
+};
+
+export async function getHomepageStatus(): Promise<HomepageStatus> {
+    const keys = [snapshotKey(false), snapshotKey(true)];
+    const [metadata, itemsWithVolumeHistory, pulse, docs] = await Promise.all([
+        CollectionMetadataModel.findOne({ collectionName: 'items' }).lean().exec(),
+        OsrsboxItemModel.countDocuments({ 'volumeHistory.0': { $exists: true } }).exec(),
+        computeMarketPulse(),
+        snapshotCollection()
+            .find({ _id: { $in: keys } }, { projection: { 'snapshot.computedAt': 1, rebuildingAt: 1 } })
+            .toArray(),
+    ]);
+    const snapshots: HomepageStatus['snapshots'] = {};
+    for (const key of keys) {
+        const doc = docs.find((d) => d._id === key);
+        snapshots[key] = { computedAt: doc?.snapshot?.computedAt ?? null, rebuildingAt: doc?.rebuildingAt ?? null };
+    }
+    return {
+        pricesUpdatedAt: metadata?.lastUpdated ?? null,
+        itemsWithVolumeHistory,
+        historyHours: pulse.historyHours,
+        snapshots,
+    };
 }
 
 /**

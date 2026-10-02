@@ -3,10 +3,10 @@
     import StatTile from '$lib/components/global/stat-tile.svelte';
     import { formatChange, formatGpShort, formatRoi } from '$lib/helpers/homepage';
     import { iconToDataUri } from '$lib/helpers/icon-to-data-uri';
-    import type { HomepageItem, HomepageSnapshot } from '$lib/models/homepage';
+    import type { HomepageItem, HomepageMarketPulse, HomepageSnapshot } from '$lib/models/homepage';
 
     /** The headline numbers across the top of the homepage, each linking to its item. */
-    const { snapshot }: { snapshot: HomepageSnapshot } = $props();
+    const { snapshot, pulse }: { snapshot: HomepageSnapshot; pulse: HomepageMarketPulse | null } = $props();
 
     type Tile = {
         label: string;
@@ -17,8 +17,8 @@
 
     /** Whichever of today's top riser and top faller moved further. */
     function biggestMover(): HomepageItem | null {
-        const riser = snapshot.marketPulse?.risers[0];
-        const faller = snapshot.marketPulse?.fallers[0];
+        const riser = pulse?.risers[0];
+        const faller = pulse?.fallers[0];
         if (!riser || !faller) return riser ?? faller ?? null;
         return Math.abs(faller.priceChange24h ?? 0) > Math.abs(riser.priceChange24h ?? 0) ? faller : riser;
     }
@@ -45,7 +45,7 @@
         }
         const alch = snapshot.alchPicks[0];
         if (alch) list.push({ label: 'Best alch', value: formatGpShort(alch.profit, true), item: alch.item });
-        const traded = snapshot.marketPulse?.mostTraded[0];
+        const traded = pulse?.mostTraded[0];
         if (traded) {
             list.push({
                 label: 'Most traded this hour',

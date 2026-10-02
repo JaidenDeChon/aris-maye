@@ -79,6 +79,10 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
   a progress bar ("7 of 23 hours of trade data collected") until the history spans 23 hours
   (`PRICE_CHANGE_MIN_HOURS`, one short of a day so a single missed run doesn't hide them).
 - Mains only. Ironmen can't trade on the GE, so the band and its tiles are left out for them.
+- **Read live.** The page fetches the band from `/api/homepage/market-pulse`, which queries the items
+  directly with a one-minute cache, rather than relying on the snapshot. It's cheap to work out, and
+  the hour count shouldn't stall when the snapshot is slow to rebuild. The snapshot's copy shows until
+  the live one lands.
 
 #### Movers floor
 
@@ -220,6 +224,9 @@ single document.
   rebuild in Mongo (`rebuildingAt`, released after 2 minutes if it dies), and the others get the
   stale snapshot. So the page works without the token, and deploy previews (which the hourly job
   never refreshes) stay current.
+- **Status:** `/api/homepage/status` shows when the hourly job last wrote prices, how many items have
+  trade history, the longest history in hours, and when each snapshot was built. Open it in a browser
+  to see where a deploy is stuck.
 - **Personal sections** query live from the browser and show skeletons while they load.
 
 ## Delivery
