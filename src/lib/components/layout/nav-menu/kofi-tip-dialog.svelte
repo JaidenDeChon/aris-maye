@@ -47,12 +47,13 @@
     <Dialog.Content class="max-w-[420px] gap-0 overflow-hidden p-0">
         <Dialog.Title class="sr-only">Leave a tip</Dialog.Title>
         <Dialog.Description class="sr-only">Ko-fi's tip form, for supporting Aris Maye.</Dialog.Description>
-        <!-- Ko-fi's panel embed: 712px tall, 4px padding on its own background. Capped to the screen. -->
+        <!-- Ko-fi's panel embed, 4px padding on its own background. 584px fits the form with a little
+             room under it (Ko-fi suggests 712px, which leaves a blank strip), capped to the screen. -->
         <iframe
             id="kofiframe"
             src={panelUrl}
             title="Leave a tip on Ko-fi"
-            class="block h-[min(712px,85vh)] w-full border-0 bg-[#f9f9f9] p-1"
+            class="block h-[min(584px,85vh)] w-full border-0 bg-[#f9f9f9] p-1"
         ></iframe>
     </Dialog.Content>
 </Dialog.Root>
