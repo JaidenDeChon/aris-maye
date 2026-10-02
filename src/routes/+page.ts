@@ -80,12 +80,29 @@ function pickHeroImage(): string {
     return `/npc-images/${npcImages[Math.floor(Math.random() * npcImages.length)]}`;
 }
 
-export const load: PageLoad = async ({ fetch }) => {
+/**
+ * Lets Netlify's CDN keep the server-rendered homepage, so most visits get it from the edge instead
+ * of waking a function (seconds on a cold start). Nothing in it is personal: profiles live in the
+ * browser, and the sections are the same snapshot for everyone. Browsers always check back, and
+ * the CDN serves its copy while it fetches a fresh one in the background for up to a day.
+ *
+ * See https://docs.netlify.com/platform/caching/
+ */
+const CDN_CACHE_HEADERS = {
+    'cache-control': 'public, max-age=0, must-revalidate',
+    'netlify-cdn-cache-control': 'public, durable, s-maxage=300, stale-while-revalidate=86400',
+};
+
+export const load: PageLoad = async ({ fetch, setHeaders }) => {
     const imageUrl = pickHeroImage();
 
     // On a click from elsewhere in the app, render now; the sections show their skeleton and fetch
     // the data (or reuse what they fetched last time).
     if (canDeferPageData()) return { imageUrl, snapshot: null };
 
-    return { imageUrl, snapshot: await loadSnapshot(fetch, browser ? HYDRATION_WAIT_MS : SNAPSHOT_WAIT_MS) };
+    const snapshot = await loadSnapshot(fetch, browser ? HYDRATION_WAIT_MS : SNAPSHOT_WAIT_MS);
+    // Only a complete page is worth keeping; one sent with skeletons is left uncached. setHeaders
+    // does nothing in the browser.
+    if (!browser && snapshot) setHeaders(CDN_CACHE_HEADERS);
+    return { imageUrl, snapshot };
 };
