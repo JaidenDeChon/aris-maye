@@ -9,6 +9,7 @@
     import { resolve } from '$app/paths';
     import type { IGameItem } from '$lib/models/game-item';
     import { addRecentSearch, recentSearchesStore, type RecentSearchEntry } from '$lib/stores/recent-searches-store';
+    import IronmanModeToggle from './ironman-mode-toggle.svelte';
 
     let searchQuery = $state('');
     let searchDialogOpen = $state(false);
@@ -73,10 +74,18 @@
 </script>
 
 <header class="flex w-full h-16 sticky top-0 border-border border-b custom-bg-blur z-30">
-    <div class="py-4 px-8 w-full flex gap-3 items-center">
+    <!--
+        On wider screens the logo and the Ironman toggle line up with the page content below
+        (`content-sizing`: 64rem wide with 2rem padding), while the menu button stays at the far left.
+        The left padding never drops below what keeps the logo clear of the menu button. Phones keep
+        the plain row.
+    -->
+    <div
+        class="py-4 px-8 w-full flex gap-3 items-center md:pl-[max(5.5rem,calc((100%_-_64rem)/2_+_2rem))] md:pr-[max(2rem,calc((100%_-_64rem)/2_+_2rem))]"
+    >
         <Sidebar.Trigger
             class={buttonVariants({
-                class: 'h-10 w-10 min-h-10 min-w-10 text-foreground border border-input rounded-md bg-background/70 hover:bg-muted/55 transition-colors',
+                class: 'h-10 w-10 min-h-10 min-w-10 text-foreground border border-input rounded-md bg-background/70 hover:bg-muted/55 transition-colors md:absolute md:left-8 md:top-1/2 md:-translate-y-1/2',
             })}
         />
 
@@ -201,5 +210,7 @@
                 </Command.Root>
             </Dialog.Content>
         </Dialog.Root>
+
+        <IronmanModeToggle />
     </div>
 </header>

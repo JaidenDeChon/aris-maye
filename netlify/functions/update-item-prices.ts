@@ -8,7 +8,7 @@ export const handler: Handler = async () => {
     try {
         await startMongo();
         console.info('MongoDB connection established. Updating all game item prices...');
-        await updateAllGameItemPricesInMongo();
+        await updateAllGameItemPricesInMongo(extraPriceDatabases());
         console.info('All game item prices updated.');
         await refreshHomepageSnapshots();
 
@@ -28,6 +28,17 @@ export const handler: Handler = async () => {
         };
     }
 };
+
+/**
+ * Other databases to keep priced, from `PRICE_SYNC_EXTRA_DBS` (comma-separated), such as the
+ * `osrsbox-dev` database deploy previews read. Netlify only runs this function for production.
+ */
+function extraPriceDatabases(): string[] {
+    return (process.env.PRICE_SYNC_EXTRA_DBS ?? '')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+}
 
 /**
  * Asks the site to rebuild its homepage sections from the new prices, so visitors don't wait for it.

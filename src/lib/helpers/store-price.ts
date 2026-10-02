@@ -86,3 +86,29 @@ export function summarizeStoreSale(value: number, terms: StoreTerms): StoreSaleS
 
     return { firstPrice, floorPrice, dropPerSale, salesToFloor };
 }
+
+/** The parts of a stored shop record that say what the shop charges a player. */
+export interface ShopSellTerms {
+    buyPrice: number | null;
+    stock: number | null;
+    currency: string | null;
+}
+
+/**
+ * The cheapest a player can buy an item from a shop for coins, or null when no coin shop sells it.
+ *
+ * A shop that pays in something other than coins (Tokkul, for one) doesn't count, and neither does
+ * one whose default stock of the item is zero.
+ * @param storePrices - The item's stored shop records.
+ */
+export function cheapestShopPrice(storePrices: readonly ShopSellTerms[] | null | undefined): number | null {
+    let cheapest: number | null = null;
+    for (const shop of storePrices ?? []) {
+        if (shop.currency !== null && shop.currency !== undefined) continue;
+        if (shop.stock === 0) continue;
+        const price = shop.buyPrice;
+        if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) continue;
+        if (cheapest === null || price < cheapest) cheapest = price;
+    }
+    return cheapest;
+}

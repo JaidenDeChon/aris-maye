@@ -24,6 +24,8 @@ export type HomepageItem = {
     volume24h: number | null;
     /** Price change over the last day as a ratio (0.05 is +5%). */
     priceChange24h: number | null;
+    /** The median of the day's hourly GE prices. Steadier than the latest high and low. */
+    typicalPrice24h: number | null;
 };
 
 /** The most profitable thing to make that uses a given skill. */
@@ -55,15 +57,44 @@ export type HomepageAlchPick = {
 /** What's trading on the GE. See "Market pulse" in `docs/homepage-plan.md`. */
 export type HomepageMarketPulse = {
     /**
-     * How many hours of trade history the hourly job has collected, up to a day. Most traded needs
-     * one; risers and fallers need a day, and show a "coming soon" state until then.
+     * How many hours of trade history the hourly job has stored, up to a day. The band is hidden
+     * while this is 0, before the job has run at all.
      */
     historyHours: number;
-    /** Hours of history risers and fallers need. */
-    hoursNeeded: number;
     mostTraded: HomepageItem[];
     risers: HomepageItem[];
     fallers: HomepageItem[];
+};
+
+/** Somewhere an Ironman can sell an item for more than it alchs for. */
+export type HomepageShopSale = {
+    item: HomepageItem;
+    shop: string;
+    /** What the shop pays for the first one. */
+    firstPrice: number;
+    /** The least it pays once overstocked. */
+    floorPrice: number;
+    /** How many sales until the price bottoms out, or null when it never drops. */
+    salesToFloor: number | null;
+    /** What one alchs for after the nature rune, for comparison. 0 when it can't be alched. */
+    alchValue: number;
+};
+
+/**
+ * Money-makers for accounts that can't use the GE. See "Ironman corner" in `docs/homepage-plan.md`.
+ * Built for every visitor; an Ironman profile sees it first.
+ */
+export type HomepageIronmanCorner = {
+    shopSales: HomepageShopSale[];
+    /**
+     * Creations whose every ingredient a shop sells. `creationCost` is what those ingredients cost
+     * from shops and `creationProfit` what's left after alching the result.
+     */
+    shopSupplied: HomepageItem[];
+    /** The best creations valued by alch on both sides, as an Ironman's profit pipeline sees them. */
+    craftToAlch: HomepageItem[];
+    /** Cheapest XP per skill, counted in alch value lost. */
+    cheapXp: HomepageCheapXp[];
 };
 
 /** Every global homepage section, computed in one go and cached. */
@@ -71,6 +102,7 @@ export type HomepageSnapshot = {
     ironman: boolean;
     /** Milliseconds since the epoch. */
     computedAt: number;
+    /** What one nature rune costs: its GE price for mains, the cheapest coin shop for Ironmen. */
     natureRunePrice: number;
     topProfit: HomepageItem[];
     topRoi: HomepageItem[];
@@ -80,6 +112,7 @@ export type HomepageSnapshot = {
     alchPicks: HomepageAlchPick[];
     /** Null for Ironmen, who can't trade on the GE. */
     marketPulse: HomepageMarketPulse | null;
+    ironmanCorner: HomepageIronmanCorner;
 };
 
 /** A skill the player is short in for an item they have almost unlocked. */
@@ -93,4 +126,17 @@ export type HomepageShortfall = {
 export type HomepageAlmostUnlocked = {
     item: HomepageItem;
     shortfalls: HomepageShortfall[];
+};
+
+/** The most XP per action a player can get in one skill at their current levels. */
+export type HomepageBestXp = {
+    skill: string;
+    item: HomepageItem;
+    /** XP for making one. */
+    xp: number;
+    /**
+     * What each XP costs: 0 when making it turns a profit, null when an ingredient has no value to
+     * put on it.
+     */
+    gpPerXp: number | null;
 };

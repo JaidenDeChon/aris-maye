@@ -12,11 +12,16 @@ describe('getVisibilityQuery', () => {
     });
 
     // The same exclusion hides a large share of what an Ironman actually makes, and they never had
-    // the GE price to begin with — alchemy is what values those items for them.
-    it('lifts the tradeable gate for an Ironman and accepts an alchemy value', () => {
+    // the GE price to begin with: alching or a shop is what values those items for them.
+    it('lifts the tradeable gate for an Ironman and accepts an alch or shop value', () => {
         expect(getVisibilityQuery(true)).toEqual({
-            $or: [{ highPrice: { $gt: 0 } }, { lowPrice: { $gt: 0 } }, { highalch: { $gt: 0 } }],
+            $or: [{ highalch: { $gt: 0 } }, { 'storePrices.0': { $exists: true } }],
         });
+    });
+
+    // A GE price means nothing to an Ironman, so it must not decide what they see.
+    it('ignores GE prices for an Ironman', () => {
+        expect(JSON.stringify(getVisibilityQuery(true))).not.toMatch(/highPrice|lowPrice/);
     });
 
     it('does not constrain tradeability for an Ironman', () => {

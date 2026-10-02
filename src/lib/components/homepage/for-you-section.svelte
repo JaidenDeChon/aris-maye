@@ -1,12 +1,11 @@
 <script lang="ts">
     import HomeItemRow from './home-item-row.svelte';
     import { Skeleton } from '$lib/components/ui/skeleton';
-    import { canUseGrandExchange } from '$lib/models/account-type';
-    import { getStoreRoot } from '$lib/stores/character-store.svelte';
+    import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { bankItemsStore, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
-    import { formatGpShort, pickSkillToTrain, skillIcon, skillLabel } from '$lib/helpers/homepage';
+    import { formatGpPerXp, formatGpShort, pickSkillToTrain, skillIcon, skillLabel } from '$lib/helpers/homepage';
     import { HOMEPAGE_ALMOST_UNLOCKED_LEVELS } from '$lib/constants/homepage';
-    import type { HomepageAlmostUnlocked } from '$lib/models/homepage';
+    import type { HomepageAlmostUnlocked, HomepageBestXp } from '$lib/models/homepage';
     import type { IGameItem } from '$lib/models/game-item';
     import type { Snippet } from 'svelte';
 
@@ -23,7 +22,7 @@
     const activeCharacter = $derived(
         characterStore?.characters?.find((c) => String(c.id) === String(characterStore?.activeCharacter)),
     );
-    const ironman = $derived(!canUseGrandExchange(activeCharacter?.accountType));
+    const ironman = $derived(activeIsIronman());
     const skillLevels = $derived.by(() => {
         if (!activeCharacter) return null;
         const levels: Record<string, number> = {};
@@ -46,6 +45,7 @@
     let bestEarners = $state<IGameItem[]>([]);
     let fromBank = $state<IGameItem[]>([]);
     let almostUnlocked = $state<HomepageAlmostUnlocked[]>([]);
+    let bestXp = $state<HomepageBestXp[]>([]);
 
     const skillToTrain = $derived(pickSkillToTrain(almostUnlocked));
     const profitLabel = $derived(ironman ? 'Ironman profit' : 'profit');
@@ -79,11 +79,15 @@
             fetch(`/api/homepage/almost-unlocked?${new URLSearchParams({ skillLevels: levels, ...ironmanFlag })}`, {
                 signal: controller.signal,
             }).then((response) => (response.ok ? (response.json() as Promise<HomepageAlmostUnlocked[]>) : [])),
+            fetch(`/api/homepage/best-xp?${new URLSearchParams({ skillLevels: levels, ...ironmanFlag })}`, {
+                signal: controller.signal,
+            }).then((response) => (response.ok ? (response.json() as Promise<HomepageBestXp[]>) : [])),
         ])
-            .then(([earners, bank, almost]) => {
+            .then(([earners, bank, almost, xp]) => {
                 bestEarners = earners;
                 fromBank = bank;
                 almostUnlocked = almost;
+                bestXp = xp;
                 loading = false;
             })
             .catch((error) => {
@@ -94,6 +98,15 @@
 
         return () => controller.abort();
     });
+
+    function xpCostText(row: HomepageBestXp): string {
+        if (row.gpPerXp === null) return 'Cost unknown';
+        if (row.gpPerXp === 0) {
+            const earned = Math.max(0, row.item.creationProfit ?? 0) / row.xp;
+            return earned > 0 ? `Profitable · +${formatGpPerXp(earned)}` : 'Free';
+        }
+        return `Costs ${formatGpPerXp(row.gpPerXp)}`;
+    }
 
     function shortfallText(entry: HomepageAlmostUnlocked): string {
         return entry.shortfalls.map((s) => `${skillLabel(s.skill)} ${s.need} (${s.need - s.have} to go)`).join(', ');
@@ -147,7 +160,8 @@
             </div>
         {/if}
 
-        <div class="grid gap-6 {suppliesParam ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}">
+        <!-- Three lists sit in a row; with the bank's as a fourth, they make two rows of two. -->
+        <div class="grid gap-6 {suppliesParam ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}">
             {#snippet earnersBody()}
                 {#if loading}
                     {@render skeletonRows()}
@@ -161,7 +175,7 @@
                         />
                     {/each}
                 {:else}
-                    <p class="text-sm text-muted-foreground">Nothing you can make turns a {profitLabel} today.</p>
+                    <p class="text-sm text-muted-foreground">Nothing you can make turns a profit today.</p>
                 {/if}
             {/snippet}
             {@render column('Your best earners', `Top ${profitLabel} at your current levels.`, earnersBody)}
@@ -189,6 +203,28 @@
                 `Money-makers within ${HOMEPAGE_ALMOST_UNLOCKED_LEVELS} levels of your stats.`,
                 almostBody,
             )}
+
+            {#snippet xpBody()}
+                {#if loading}
+                    {@render skeletonRows()}
+                {:else if bestXp.length}
+                    {#each bestXp.slice(0, PICK_COUNT) as row (row.skill)}
+                        <HomeItemRow
+                            item={row.item}
+                            value={`${row.xp.toLocaleString('en-US')} xp`}
+                            detail={xpCostText(row)}
+                        >
+                            <span class="flex items-center gap-1 text-xs text-muted-foreground">
+                                <img src={skillIcon(row.skill)} alt="" class="h-3.5 w-3.5" />
+                                {skillLabel(row.skill)}
+                            </span>
+                        </HomeItemRow>
+                    {/each}
+                {:else}
+                    <p class="text-sm text-muted-foreground">Nothing you can make gives XP yet.</p>
+                {/if}
+            {/snippet}
+            {@render column('Best XP', 'The most XP per action you can get right now.', xpBody)}
 
             {#if suppliesParam}
                 {#snippet bankBody()}

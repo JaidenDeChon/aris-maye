@@ -7,6 +7,7 @@ import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
 import { skillSpellings } from '$lib/constants/skill-aliases';
+import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -54,6 +55,34 @@ export async function getNatureRunePrice(): Promise<number> {
         const price = rune?.highPrice ?? rune?.lowPrice ?? null;
         const resolved = typeof price === 'number' && price > 0 ? price : NATURE_RUNE_FALLBACK_PRICE;
         natureRunePriceCache = { price: resolved, readAt: Date.now() };
+        return resolved;
+    } catch {
+        return NATURE_RUNE_FALLBACK_PRICE;
+    }
+}
+
+let ironmanNatureRunePriceCache: { price: number; readAt: number } | null = null;
+
+/**
+ * What a nature rune costs an Ironman: the cheapest coin shop that sells one.
+ *
+ * An Ironman can't buy from the GE, so its price says nothing about what each alch costs them.
+ * Falls back to `NATURE_RUNE_FALLBACK_PRICE` when the shop data has no coin shop selling runes,
+ * since `populate-store-prices` only records shops that also buy from players.
+ */
+export async function getIronmanNatureRunePrice(): Promise<number> {
+    if (ironmanNatureRunePriceCache && Date.now() - ironmanNatureRunePriceCache.readAt < NATURE_RUNE_CACHE_MS) {
+        return ironmanNatureRunePriceCache.price;
+    }
+
+    try {
+        const rune = await OsrsboxItemModel.findOne({ id: NATURE_RUNE_ITEM_ID })
+            .select({ storePrices: 1 })
+            .lean<{ storePrices?: ShopSellTerms[] }>()
+            .exec();
+
+        const resolved = cheapestShopPrice(rune?.storePrices) ?? NATURE_RUNE_FALLBACK_PRICE;
+        ironmanNatureRunePriceCache = { price: resolved, readAt: Date.now() };
         return resolved;
     } catch {
         return NATURE_RUNE_FALLBACK_PRICE;
@@ -339,13 +368,13 @@ export async function getPaginatedGameItems(params?: {
     const supplies = normalizeSupplies(params?.supplies);
     const supplyMap = supplies ?? (suppliesActive ? {} : null);
 
-    // Under Ironman an item's value can come from alchemy rather than the market, so `highalch` joins
-    // the sort keys. Every key here is a stored field, so this stays an index-eligible sort rather
+    // Under Ironman an item's value comes from alching or shops, never the market, so the GE price
+    // stays out of the sort keys. Every key here is a stored field, so this stays an index-eligible sort rather
     // than a computed one — the profit pipeline is already the expensive path and must not grow.
     // Annotated rather than inferred: a bare object literal widens its values to `number`, which
     // Mongoose's `sort()` rejects because it wants the `SortOrder` literals.
     const valueSortKeys: Record<string, 1 | -1> = ironman
-        ? { highPrice: sortDirection, highalch: sortDirection, cost: sortDirection, name: 1 }
+        ? { highalch: sortDirection, cost: sortDirection, name: 1 }
         : { highPrice: sortDirection, cost: sortDirection, name: 1 };
 
     if (!skillLevels && !profitDrivenSort && !profitMode && !suppliesActive && !supplies) {
@@ -369,7 +398,9 @@ export async function getPaginatedGameItems(params?: {
     // cost — and with it their ROI — is zero for every survivor. Filtering on ROI as well would
     // leave nothing at all, so skip it there and let the sort fall through to profit instead.
     const filterMissingRoi = roiSort && !enforceSupplies;
-    const natureRunePrice = ironman && shouldComputeProfit ? await getNatureRunePrice() : NATURE_RUNE_FALLBACK_PRICE;
+    // Only Ironman values involve the rune, and an Ironman pays a shop for it, not the GE.
+    const natureRunePrice =
+        ironman && shouldComputeProfit ? await getIronmanNatureRunePrice() : NATURE_RUNE_FALLBACK_PRICE;
     const profitStages = shouldComputeProfit
         ? buildProfitPipeline(supplyMap, profitDrivenSort, enforceSupplies, filterMissingRoi, ironman, natureRunePrice)
         : [];
@@ -495,15 +526,14 @@ function normalizeFilter(filter?: GameItemFilter): GameItemFilter {
  * Restricts results to items the reader can actually put a number against.
  *
  * A Grand Exchange price is the only value a main has, so for them an item without one is a row of
- * dashes. An Ironman never had that price to begin with: alchemy values them instead, which is why
- * `highalch` counts here. Shop prices join this list once they are scraped.
+ * dashes. An Ironman never had that price to begin with, and a GE price says nothing to them: an
+ * item counts for an Ironman only when it can be alched or a shop trades it.
  * @param ironman - Whether the reader is on an account that cannot use the Grand Exchange.
  * @returns A query fragment requiring at least one usable value.
  */
 function getValidPriceQuery(ironman = false): Record<string, unknown> {
-    const clauses: Record<string, unknown>[] = [{ highPrice: { $gt: 0 } }, { lowPrice: { $gt: 0 } }];
-    if (ironman) clauses.push({ highalch: { $gt: 0 } });
-    return { $or: clauses };
+    if (ironman) return { $or: [{ highalch: { $gt: 0 } }, { 'storePrices.0': { $exists: true } }] };
+    return { $or: [{ highPrice: { $gt: 0 } }, { lowPrice: { $gt: 0 } }] };
 }
 
 /**
@@ -637,10 +667,49 @@ export function buildProfitPipeline(
     // Ironman mode swaps what both sides of the recipe are priced at, not just what is displayed.
     // Leaving these on Grand Exchange prices is what made the browse ranking identical in both
     // modes: the numbers on the cards changed, the order they came back in did not.
-    const unitPriceExpr = ironman
-        ? ironmanValueExpr('$$matched.highalch', '$$matched.name', '$$matched.cost')
-        : geUnitPriceExpr;
-    const outputPriceExpr = ironman ? ironmanValueExpr('$highalch', '$name', '$cost') : geOutputPriceExpr;
+    /** Shop records that trade in coins; Tokkul and the like aren't gp. */
+    const coinShopsExpr = (storePricesField: string, cond: Record<string, unknown>) => ({
+        $filter: {
+            input: { $ifNull: [storePricesField, []] },
+            as: 'sp',
+            cond: { $and: [{ $eq: [{ $ifNull: ['$$sp.currency', null] }, null] }, cond] },
+        },
+    });
+    // An Ironman buys an ingredient from the cheapest coin shop that stocks it, when one does, and
+    // otherwise gives up its alch value by using it. `$min` skips whichever of the two is missing.
+    const ironmanUnitPriceExpr = {
+        $min: [
+            ironmanValueExpr('$$matched.highalch', '$$matched.name', '$$matched.cost'),
+            {
+                $min: {
+                    $map: {
+                        input: coinShopsExpr('$$matched.storePrices', {
+                            $and: [{ $gt: [{ $ifNull: ['$$sp.buyPrice', 0] }, 0] }, { $ne: ['$$sp.stock', 0] }],
+                        }),
+                        as: 'sp',
+                        in: '$$sp.buyPrice',
+                    },
+                },
+            },
+        ],
+    };
+    // A finished item is worth whichever pays more: alching it, or the best coin shop's first sale.
+    const ironmanOutputPriceExpr = {
+        $max: [
+            ironmanValueExpr('$highalch', '$name', '$cost'),
+            {
+                $max: {
+                    $map: {
+                        input: coinShopsExpr('$storePrices', { $gt: [{ $ifNull: ['$$sp.firstPrice', 0] }, 0] }),
+                        as: 'sp',
+                        in: '$$sp.firstPrice',
+                    },
+                },
+            },
+        ],
+    };
+    const unitPriceExpr = ironman ? ironmanUnitPriceExpr : geUnitPriceExpr;
+    const outputPriceExpr = ironman ? ironmanOutputPriceExpr : geOutputPriceExpr;
     const ingredientCostRowsExpr = {
         $map: {
             input: '$consumedIngredients',
@@ -775,6 +844,7 @@ export function buildProfitPipeline(
                             highalch: 1,
                             tradeable_on_ge: 1,
                             buy_limit: 1,
+                            storePrices: 1,
                         },
                     },
                 ],

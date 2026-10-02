@@ -27,6 +27,7 @@ function item(id: number, creationProfit: number): HomepageItem {
         volume1h: null,
         volume24h: null,
         priceChange24h: null,
+        typicalPrice24h: null,
     };
 }
 

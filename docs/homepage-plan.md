@@ -71,14 +71,19 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 ### 5. Market pulse (PR 2)
 
 - **Most traded:** `volume1h` (high + low volume), with the GP value traded shown as a secondary number.
-- **Risers / fallers:** `priceChange24h = (latestMid − firstMid) / firstMid`, comparing the average price
-  of the first and latest hours in the item's day of history that had trades. Hourly averages are
-  steadier than single latest prices. Only items that pass the movers floor below count.
-- **Before there's enough data:** the band still shows. With no history at all it's one "Coming soon"
-  card. Once there's an hour, Most traded fills in, and risers and fallers show a "Coming soon" card with
-  a progress bar ("7 of 23 hours of trade data collected") until the history spans 23 hours
-  (`PRICE_CHANGE_MIN_HOURS`, one short of a day so a single missed run doesn't hide them).
+- **Risers / fallers:** `priceChange24h` compares the median hourly price of the last 3 traded hours
+  (`MOVERS_PRICE_HOURS`) with the first 3 in the item's day of history. Each hour's price is the
+  wiki's average buy and sell prices weighted by how many of each traded, so a few insta-buys at a
+  silly price don't swamp a hundred ordinary sales, and the median means one odd hour at either end
+  can't set the change. Only items that pass the movers floor below count.
+- **History is backfilled.** Each run fills in any of the last 24 hours the database is missing from
+  `/1h?timestamp=`, so a new database has a full day after one run, and a skipped hour or an outage
+  catches up on the next. The band is hidden only before the job has stored anything at all.
 - Mains only. Ironmen can't trade on the GE, so the band and its tiles are left out for them.
+- **Read live.** The page fetches the band from `/api/homepage/market-pulse`, which queries the items
+  directly with a one-minute cache, rather than relying on the snapshot. It's cheap to work out, and
+  the hour count shouldn't stall when the snapshot is slow to rebuild. The snapshot's copy shows until
+  the live one lands.
 
 #### Movers floor
 
@@ -88,8 +93,11 @@ For each skill in `skills-grid`, the item with the highest `creationProfit` whos
 
 An item counts as a mover only when both of these hold:
 
-- **GP traded per day ≥ 10,000,000**, where GP traded is `volume24h × mid`.
+- **GP traded per day ≥ 10,000,000**, where GP traded is `volume24h × typicalPrice24h`, the median of
+  the day's hourly prices. The latest high and low aren't used, because one odd trade sets them.
 - **Trades per day ≥ 10**, i.e. `volume24h`.
+- **Traded in at least 18 of the day's hours** (`MOVERS_MIN_TRADED_HOURS`), so a handful of trades
+  doesn't set an occasional item's change.
 
 **Why a floor at all.** Rarely traded items swing wildly. If a niche item sells 3 times a day and
 one player dumps it 60% under the usual price, it would top the fallers list. That's one impatient
@@ -137,18 +145,35 @@ These modules read `character-store` and `bank-items-store` and call the existin
 
 ### 7. Ironman corner (PR 3)
 
-These use the pipeline's Ironman mode (`ironmanExitValue`) and `storePrices`.
+Built for every visitor and cached in both snapshots. Mains find it at the end of the page; an Ironman
+profile sees it first, and on phones as the first tab.
 
-- **Best shop sales:** items whose best `storePrices.firstPrice` beats `highalch`, with
-  `salesToFloor` shown as "sell N before the price bottoms out".
-- **Craft-to-alch profit:** `creationProfit` in Ironman mode, i.e. product alch value minus the
-  value of the ingredients.
-- **Cheapest Ironman XP:** the same as Cheapest XP, but valued in alch value lost per XP.
-- **Shop-supplied crafts:** creations where every leaf ingredient can be bought from an NPC shop
-  (`storePrices.buyPrice` with `stock > 0`) or crafted from such inputs. Ranked by exit value minus
-  the shop cost. This is the closest workable version of "self-sufficient": the dataset can't yet
-  tell gatherable resources from drop-only ones (see `ironman-feature-recommendations.md`), so
-  gathered inputs aren't counted until source data exists.
+- **Sell to shops:** items whose best coin-shop `storePrices.firstPrice` beats their alch value after a
+  nature rune, ranked by the gain, one shop per item. Shows the shop, the alch value, and how many sales
+  until the price bottoms out (`salesToFloor`, `floorPrice`). Shops paying in Tokkul and the like are
+  left out.
+- **Make from shop stock:** creations whose every direct ingredient a coin shop sells
+  (`storePrices.buyPrice > 0`, stock not 0), priced at the cheapest such shop, with coins at face value.
+  Profit is the result's alch value after a nature rune, less those costs. This is the workable version
+  of "self-sufficient": the dataset can't tell gatherable resources from drop-only ones (see
+  `ironman-feature-recommendations.md`). It also only knows shops that buy from players, since that's
+  what `populate-store-prices` scrapes, so a few sell-only shops are missed.
+- **Craft to alch:** the Ironman profit pipeline's top creations (alch value on both sides).
+- **Cheapest Ironman XP:** Cheapest XP, valued in alch value lost per XP.
+
+**Nothing an Ironman sees depends on the GE.** In Ironman mode an ingredient costs the cheaper of its
+cheapest coin-shop price and its alch value, and a finished item is worth the higher of the best coin
+shop's first-sale price and its alch value. Each alch charges a nature rune at the cheapest coin-shop
+price (`getIronmanNatureRunePrice`, falling back to `NATURE_RUNE_FALLBACK_PRICE`). An item only appears
+when it can be alched or a shop trades it, and `/items` sorts Ironman results without the GE price. This
+covers the Ironman snapshot, For you, Almost unlocked, Best XP, "Train X next", this corner, and `/items`.
+
+**Ironman mode toggle.** `activeIsIronman()` in the character store is the one switch every price reads.
+It follows the active character's account type unless the top-bar toggle overrides it for that
+character; selecting another character goes back to that character's own type.
+
+An Ironman profile skips the last two here, because the page's main sections already show them valued
+the Ironman way.
 
 ## GE tax
 
@@ -176,10 +201,22 @@ volume24h: number; // sum of volumeHistory.v
 priceChange24h: number | null; // null until the history spans PRICE_CHANGE_MIN_HOURS
 ```
 
-A second run in the same hour replaces that hour instead of counting it twice. An item missing from the
+`VOLUME_HISTORY_VERSION` is stored in the database's metadata. When a change to how an hour is
+recorded bumps it, the next run fetches the whole day again, so old and new hours never mix.
+
+A second run in the same hour replaces that hour instead of counting it twice. Any of the last 24
+hours the database is missing are fetched by timestamp (6 at a time, about half a second for a full
+day) and slotted in, with each hour fetched once however many databases the run updates. An item missing from the
 hour's data traded nothing and gets a zero entry. If the `/1h` fetch fails, the run logs it and updates
 prices alone. The numbers live in `src/lib/constants/market.ts`, which has no imports so the job's bundler
 can read it.
+
+**Deploy previews.** Netlify only runs scheduled functions for production, and previews read
+`osrsbox-dev` (so a rebuild there can be checked before `promote-db` copies it to prod). Set
+`PRICE_SYNC_EXTRA_DBS=osrsbox-dev` on the site and the job writes the same prices and volume to dev
+after prod, from the one wiki fetch. One database takes about 5 seconds to write, so two stay well
+inside the 30-second limit on scheduled functions. A failure on an extra database is logged and
+doesn't fail the run.
 
 There's an index on `{ tradeable_on_ge: 1, volume1h: -1 }`. The volume fields could also power new sorts
 on `/items` later.
@@ -195,9 +232,17 @@ single document.
   `x-refresh-token` header. The job can't import the homepage service directly because its bundler
   can't resolve `$lib` imports. The endpoint only exists when `HOMEPAGE_REFRESH_TOKEN` is set on the
   site, and the job skips the call when it isn't.
-- **Fallback:** a snapshot older than 65 minutes (`HOMEPAGE_SNAPSHOT_MAX_AGE_MS`) or missing is rebuilt
-  on the request that finds it, so the page works without the token, just slower for one visitor an
-  hour.
+- **Fallback:** a snapshot older than 65 minutes (`HOMEPAGE_SNAPSHOT_MAX_AGE_MS`) is still served
+  straight away. The browser sees its age and asks `/api/homepage?fresh=1`, which rebuilds it within
+  that request and swaps the new one in. A missing snapshot is built on the request that finds it.
+  The server never rebuilds in the background, because Netlify freezes a function once it has
+  answered and the rebuild would never finish. Only one request rebuilds at a time: it claims the
+  rebuild in Mongo (`rebuildingAt`, released after 2 minutes if it dies), and the others get the
+  stale snapshot. So the page works without the token, and deploy previews (which the hourly job
+  never refreshes) stay current.
+- **Status:** `/api/homepage/status` shows when the hourly job last wrote prices, how many items have
+  trade history, the longest history in hours, and when each snapshot was built. Open it in a browser
+  to see where a deploy is stuck.
 - **Personal sections** query live from the browser and show skeletons while they load.
 
 ## Delivery
