@@ -1,15 +1,3 @@
-<script lang="ts" module>
-    import type { HomepageSnapshot as Snapshot } from '$lib/models/homepage';
-
-    /**
-     * The last snapshots this tab saw, kept for the next visit. Clicking back to the homepage from
-     * elsewhere in the app renders straight away with no server data, so without this the sections
-     * would show their skeleton every time. Past its age, a remembered snapshot is still shown and
-     * refreshed below like any other.
-     */
-    const remembered: { main: Snapshot | null; ironman: Snapshot | null } = { main: null, ironman: null };
-</script>
-
 <script lang="ts">
     import { onMount } from 'svelte';
     import * as Tabs from '$lib/components/ui/tabs';
@@ -43,8 +31,8 @@
      */
     const { snapshot: serverSnapshot }: { snapshot: HomepageSnapshot | null } = $props();
 
-    let fetchedMain = $state<HomepageSnapshot | null>(remembered.main);
-    let ironmanSnapshot = $state<HomepageSnapshot | null>(remembered.ironman);
+    let fetchedMain = $state<HomepageSnapshot | null>(null);
+    let ironmanSnapshot = $state<HomepageSnapshot | null>(null);
     let failed = $state(false);
     let mounted = $state(false);
     onMount(() => (mounted = true));
@@ -53,12 +41,6 @@
     const ironman = $derived(mounted && activeIsIronman());
     const mainSnapshot = $derived(fetchedMain ?? serverSnapshot);
     const snapshot = $derived(ironman ? ironmanSnapshot : mainSnapshot);
-
-    $effect(() => {
-        if (mainSnapshot && (!remembered.main || mainSnapshot.computedAt >= remembered.main.computedAt))
-            remembered.main = mainSnapshot;
-        if (ironmanSnapshot) remembered.ironman = ironmanSnapshot;
-    });
 
     $effect(() => {
         if (!mounted || snapshot || failed) return;

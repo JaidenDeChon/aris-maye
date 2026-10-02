@@ -3,18 +3,6 @@
     import CharacterStatsDialogButton from '../dialogs/character-stats-dialog.svelte';
     import { resolve } from '$app/paths';
     const { bgUrl } = $props();
-
-    // The NPC fades in once it has loaded rather than popping in, so a slow image never leaves a
-    // blank gap that snaps to a picture.
-    let npcLoaded = $state(false);
-
-    /** Marks the image loaded, including one that finished before the page hydrated. */
-    function fadeInWhenLoaded(image: HTMLImageElement) {
-        const done = () => (npcLoaded = true);
-        if (image.complete && image.naturalWidth > 0) done();
-        else image.addEventListener('load', done, { once: true });
-        return () => image.removeEventListener('load', done);
-    }
 </script>
 
 <div class="py-32 relative overflow-hidden">
@@ -26,12 +14,8 @@
         {#if bgUrl}
             <img
                 src={bgUrl}
-                data-hero-npc
                 alt="randomly-selected background"
-                {@attach fadeInWhenLoaded}
-                class="w-64 absolute top-1/3 right-1/4 translate-x-1/2 -translate-y-1/4 z-10 transition-opacity duration-500 {npcLoaded
-                    ? 'opacity-15 xl:opacity-100'
-                    : 'opacity-0'}"
+                class="w-64 absolute top-1/3 right-1/4 translate-x-1/2 -translate-y-1/4 z-10 opacity-15 transition-opacity xl:opacity-100"
             />
         {/if}
 
