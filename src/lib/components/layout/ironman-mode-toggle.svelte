@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { Shield } from 'lucide-svelte';
     import { Switch } from '$lib/components/ui/switch';
     import { activeIsIronman, setIronmanMode } from '$lib/stores/character-store.svelte';
 
@@ -19,7 +18,11 @@
     class="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-input bg-background/70 px-3 text-sm text-foreground transition-colors hover:bg-muted/55 lg:ml-auto"
     title="Ironman mode: prices from alching and shops only, nothing from the Grand Exchange"
 >
-    <Shield class="h-4 w-4 {ironman ? 'text-primary' : 'text-muted-foreground'}" aria-hidden="true" />
+    <img
+        src="/other-images/ironman.png"
+        alt=""
+        class="h-[18px] w-[18px] [image-rendering:pixelated] transition-opacity {ironman ? '' : 'opacity-50'}"
+    />
     <span class="hidden sm:inline">Ironman</span>
     <Switch
         checked={ironman}
