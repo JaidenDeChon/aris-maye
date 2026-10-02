@@ -7,6 +7,7 @@
     import { toggleMode } from 'mode-watcher';
     import { Moon, Sun, Info } from 'lucide-svelte';
     import { resolve } from '$app/paths';
+    import KofiTipDialog from './kofi-tip-dialog.svelte';
 
     const sidebar = Sidebar.useSidebar();
     const { showDevControls = false } = $props<{ showDevControls?: boolean }>();
@@ -125,20 +126,26 @@
                 </Tooltip.Content>
             </Tooltip.Root>
         </Tooltip.Provider>
+
+        <KofiTipDialog expanded />
     </div>
 {:else if !sidebar.open}
-    <Tooltip.Provider>
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button variant="outline" class="h-9 w-9" onclick={toggleMode}>
-                    <span class="flex h-5 w-5 items-center justify-center shrink-0 relative">
-                        <Sun class="block transition-opacity dark:hidden" />
-                        <Moon class="block transition-opacity hidden dark:block" />
-                    </span>
-                    <span class="sr-only">Toggle theme</span>
-                </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content side="right">Toggle theme</Tooltip.Content>
-        </Tooltip.Root>
-    </Tooltip.Provider>
+    <div class="flex flex-col items-center gap-2">
+        <Tooltip.Provider>
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button variant="outline" class="h-9 w-9" onclick={toggleMode}>
+                        <span class="flex h-5 w-5 items-center justify-center shrink-0 relative">
+                            <Sun class="block transition-opacity dark:hidden" />
+                            <Moon class="block transition-opacity hidden dark:block" />
+                        </span>
+                        <span class="sr-only">Toggle theme</span>
+                    </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content side="right">Toggle theme</Tooltip.Content>
+            </Tooltip.Root>
+        </Tooltip.Provider>
+
+        <KofiTipDialog expanded={false} />
+    </div>
 {/if}
