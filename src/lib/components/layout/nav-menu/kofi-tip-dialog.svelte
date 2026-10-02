@@ -7,15 +7,14 @@
     /**
      * A "Leave a tip" button for the bottom of the sidenav that opens Ko-fi's tip form in a dialog.
      *
-     * This is the same page Ko-fi's floating-chat overlay script shows in its popup, without the
-     * script itself: that pins its own button to the bottom-left of the screen, right over the
-     * sidenav footer, and loads a third-party script on every page. The form only loads once the
-     * dialog opens.
+     * The form is Ko-fi's donation panel embed, inside our own dialog rather than Ko-fi's floating
+     * popup, which pins its own button over the sidenav footer and loads a script on every page.
+     * The panel only loads once the dialog opens.
      */
     const { expanded }: { expanded: boolean } = $props();
 
     const KOFI_PAGE = 'jaidendechon';
-    const formUrl = `https://ko-fi.com/${KOFI_PAGE}/?hidefeed=true&widget=true&embed=true`;
+    const panelUrl = `https://ko-fi.com/${KOFI_PAGE}/?hidefeed=true&widget=true&embed=true&preview=true`;
 
     const buttonClass =
         'text-foreground border border-input rounded-md bg-background/70 hover:bg-muted/55 transition-colors';
@@ -48,10 +47,12 @@
     <Dialog.Content class="max-w-[420px] gap-0 overflow-hidden p-0">
         <Dialog.Title class="sr-only">Leave a tip</Dialog.Title>
         <Dialog.Description class="sr-only">Ko-fi's tip form, for supporting Aris Maye.</Dialog.Description>
+        <!-- Ko-fi's panel embed: 712px tall, 4px padding on its own background. Capped to the screen. -->
         <iframe
-            src={formUrl}
+            id="kofiframe"
+            src={panelUrl}
             title="Leave a tip on Ko-fi"
-            class="block h-[min(630px,85vh)] w-full border-0 bg-[#f9f9f9]"
+            class="block h-[min(712px,85vh)] w-full border-0 bg-[#f9f9f9] p-1"
         ></iframe>
     </Dialog.Content>
 </Dialog.Root>
