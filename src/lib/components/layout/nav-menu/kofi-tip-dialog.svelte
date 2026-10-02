@@ -44,7 +44,13 @@
         </Tooltip.Provider>
     {/if}
 
-    <Dialog.Content class="max-w-[420px] gap-0 overflow-hidden p-0">
+    <!-- The close button sits over Ko-fi's panel, whose colours come from the Ko-fi profile rather
+         than our theme, so it's a white chip with a dark X in both themes: it stands out on a dark
+         panel, and its border and shadow mark it out on a light one. -->
+    <Dialog.Content
+        class="max-w-[420px] gap-0 overflow-hidden p-0"
+        closeClass="right-3 top-3 rounded-full border border-neutral-300 bg-white p-1.5 text-neutral-900 opacity-95 shadow-md"
+    >
         <Dialog.Title class="sr-only">Leave a tip</Dialog.Title>
         <Dialog.Description class="sr-only">Ko-fi's tip form, for supporting Aris Maye.</Dialog.Description>
         <!-- Ko-fi's panel embed, 4px padding on its own background. 584px fits the form with a little

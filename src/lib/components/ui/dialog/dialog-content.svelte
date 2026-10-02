@@ -9,10 +9,13 @@
         ref = $bindable(null),
         class: className,
         portalProps,
+        closeClass,
         children,
         ...restProps
     }: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
         portalProps?: DialogPrimitive.PortalProps;
+        /** Extra classes for the close button, e.g. to keep it visible over embedded content. */
+        closeClass?: string;
         children: Snippet;
     } = $props();
 </script>
@@ -29,7 +32,10 @@
     >
         {@render children?.()}
         <DialogPrimitive.Close
-            class="ring-offset-background focus:ring-ring absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none"
+            class={cn(
+                'ring-offset-background focus:ring-ring absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none',
+                closeClass,
+            )}
         >
             <X class="size-4" />
             <span class="sr-only">Close</span>
