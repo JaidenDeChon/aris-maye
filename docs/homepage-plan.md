@@ -212,9 +212,14 @@ single document.
   `x-refresh-token` header. The job can't import the homepage service directly because its bundler
   can't resolve `$lib` imports. The endpoint only exists when `HOMEPAGE_REFRESH_TOKEN` is set on the
   site, and the job skips the call when it isn't.
-- **Fallback:** a snapshot older than 65 minutes (`HOMEPAGE_SNAPSHOT_MAX_AGE_MS`) or missing is rebuilt
-  on the request that finds it, so the page works without the token, just slower for one visitor an
-  hour.
+- **Fallback:** a snapshot older than 65 minutes (`HOMEPAGE_SNAPSHOT_MAX_AGE_MS`) is still served
+  straight away. The browser sees its age and asks `/api/homepage?fresh=1`, which rebuilds it within
+  that request and swaps the new one in. A missing snapshot is built on the request that finds it.
+  The server never rebuilds in the background, because Netlify freezes a function once it has
+  answered and the rebuild would never finish. Only one request rebuilds at a time: it claims the
+  rebuild in Mongo (`rebuildingAt`, released after 2 minutes if it dies), and the others get the
+  stale snapshot. So the page works without the token, and deploy previews (which the hourly job
+  never refreshes) stay current.
 - **Personal sections** query live from the browser and show skeletons while they load.
 
 ## Delivery

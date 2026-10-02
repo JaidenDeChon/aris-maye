@@ -585,7 +585,15 @@ export async function computeHomepageSnapshot(ironman: boolean): Promise<Homepag
     };
 }
 
-type SnapshotDoc = { _id: string; snapshot: HomepageSnapshot };
+type SnapshotDoc = {
+    _id: string;
+    snapshot?: HomepageSnapshot;
+    /** When a request last claimed this snapshot's rebuild. See `getFreshHomepageSnapshot`. */
+    rebuildingAt?: number;
+};
+
+/** How long a claimed rebuild holds off other requests before they assume it died and try again. */
+const REBUILD_CLAIM_MS = 2 * 60 * 1000;
 
 function snapshotCollection() {
     return mongoose.connection.collection<SnapshotDoc>(SNAPSHOT_COLLECTION);
@@ -594,12 +602,16 @@ function snapshotCollection() {
 /** Rebuilds a snapshot and stores it. The hourly price job calls this so visitors rarely wait. */
 export async function refreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
     const snapshot = await computeHomepageSnapshot(ironman);
-    await snapshotCollection().updateOne({ _id: snapshotKey(ironman) }, { $set: { snapshot } }, { upsert: true });
+    await snapshotCollection().updateOne(
+        { _id: snapshotKey(ironman) },
+        { $set: { snapshot }, $unset: { rebuildingAt: '' } },
+        { upsert: true },
+    );
     memoryCache.set(snapshotKey(ironman), { snapshot, readAt: Date.now() });
     return snapshot;
 }
 
-/** Rebuilds a snapshot once, however many requests ask for it at the same time. */
+/** Rebuilds a snapshot once, however many requests in this instance ask for it at the same time. */
 function rebuildOnce(ironman: boolean): Promise<HomepageSnapshot> {
     const key = snapshotKey(ironman);
     const inFlight = rebuildsInFlight.get(key);
@@ -614,14 +626,20 @@ function snapshotKey(ironman: boolean): string {
     return `${ironman ? 'ironman' : 'ge'}-v${SNAPSHOT_VERSION}`;
 }
 
+function isStale(snapshot: HomepageSnapshot): boolean {
+    return Date.now() - snapshot.computedAt >= HOMEPAGE_SNAPSHOT_MAX_AGE_MS;
+}
+
 /**
  * The global homepage sections, as fast as they can be had.
  *
  * - A snapshot this instance read in the last minute comes straight from memory.
- * - Otherwise it's read from Mongo. A stale one is still returned straight away, and a rebuild
- *   starts in the background, so a visitor never waits on the expensive aggregation just because
- *   the hourly job hasn't run.
+ * - Otherwise it's read from Mongo, and returned even when it's stale. The browser sees the old
+ *   `computedAt` and asks `getFreshHomepageSnapshot` for a new one.
  * - Only when there's no snapshot at all does the caller wait for one to be built.
+ *
+ * This never starts a rebuild it doesn't wait for: on Netlify a function is frozen once it has
+ * answered, so a rebuild left running in the background never finishes.
  */
 export async function getHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
     const key = snapshotKey(ironman);
@@ -629,13 +647,45 @@ export async function getHomepageSnapshot(ironman: boolean): Promise<HomepageSna
     if (remembered && Date.now() - remembered.readAt < MEMORY_CACHE_MS) return remembered.snapshot;
 
     const cached = await snapshotCollection().findOne({ _id: key });
-    if (!cached) return rebuildOnce(ironman);
+    if (!cached?.snapshot) return rebuildOnce(ironman);
 
     memoryCache.set(key, { snapshot: cached.snapshot, readAt: Date.now() });
-    if (Date.now() - cached.snapshot.computedAt >= HOMEPAGE_SNAPSHOT_MAX_AGE_MS) {
-        rebuildOnce(ironman).catch((error) => console.error('Background homepage rebuild failed:', error));
-    }
     return cached.snapshot;
+}
+
+/**
+ * A snapshot no older than `HOMEPAGE_SNAPSHOT_MAX_AGE_MS`, rebuilt now if need be.
+ *
+ * Only one request across every server instance rebuilds a stale snapshot at a time: it claims the
+ * rebuild in Mongo first, and any other request that finds it claimed gets the stale one back.
+ */
+export async function getFreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
+    const key = snapshotKey(ironman);
+    const cached = await snapshotCollection().findOne({ _id: key });
+    if (!cached?.snapshot) return rebuildOnce(ironman);
+    if (!isStale(cached.snapshot)) {
+        memoryCache.set(key, { snapshot: cached.snapshot, readAt: Date.now() });
+        return cached.snapshot;
+    }
+
+    const now = Date.now();
+    const claim = await snapshotCollection().updateOne(
+        {
+            _id: key,
+            $or: [{ rebuildingAt: { $exists: false } }, { rebuildingAt: { $lt: now - REBUILD_CLAIM_MS } }],
+        },
+        { $set: { rebuildingAt: now } },
+    );
+    if (!claim.modifiedCount) return cached.snapshot;
+
+    try {
+        return await rebuildOnce(ironman);
+    } catch (error) {
+        await snapshotCollection()
+            .updateOne({ _id: key }, { $unset: { rebuildingAt: '' } })
+            .catch(() => {});
+        throw error;
+    }
 }
 
 /**

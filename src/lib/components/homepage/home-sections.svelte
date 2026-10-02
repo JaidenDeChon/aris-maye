@@ -11,6 +11,7 @@
     import HomeSectionsSkeleton from './home-sections-skeleton.svelte';
     import { activeIsIronman } from '$lib/stores/character-store.svelte';
     import { timeSince } from '$lib/helpers/time-since';
+    import { HOMEPAGE_SNAPSHOT_MAX_AGE_MS } from '$lib/constants/homepage';
     import type { HomepageSnapshot } from '$lib/models/homepage';
 
     /**
@@ -23,6 +24,10 @@
      * the page arrives with a skeleton and the browser fetches them. An Ironman profile always
      * fetches its own values, with the skeleton up until they land, so a main's numbers never
      * flash past.
+     *
+     * A snapshot past its age is shown as it is, and the browser asks for a rebuilt one to swap in.
+     * The server can't rebuild in the background, so this is what keeps the numbers moving when the
+     * hourly job's refresh doesn't run.
      */
     const { snapshot: serverSnapshot }: { snapshot: HomepageSnapshot | null } = $props();
 
@@ -34,7 +39,7 @@
 
     // Before mount the profile isn't readable yet, so the server's render (a main's view) stands.
     const ironman = $derived(mounted && activeIsIronman());
-    const mainSnapshot = $derived(serverSnapshot ?? fetchedMain);
+    const mainSnapshot = $derived(fetchedMain ?? serverSnapshot);
     const snapshot = $derived(ironman ? ironmanSnapshot : mainSnapshot);
 
     $effect(() => {
@@ -56,6 +61,30 @@
                 failed = true;
             });
         return () => controller.abort();
+    });
+
+    // Asked for once per view, whatever comes back: a request that finds another one already
+    // rebuilding gets the same stale snapshot, and trying again straight away wouldn't help.
+    const refreshRequested = { main: false, ironman: false };
+    $effect(() => {
+        if (!mounted || !snapshot) return;
+        const shownAt = snapshot.computedAt;
+        if (Date.now() - shownAt < HOMEPAGE_SNAPSHOT_MAX_AGE_MS) return;
+        const wantIronman = ironman;
+        const view = wantIronman ? 'ironman' : 'main';
+        if (refreshRequested[view]) return;
+        refreshRequested[view] = true;
+        fetch(wantIronman ? '/api/homepage?ironman=1&fresh=1' : '/api/homepage?fresh=1')
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json() as Promise<HomepageSnapshot>;
+            })
+            .then((data) => {
+                if (data.computedAt <= shownAt) return;
+                if (wantIronman) ironmanSnapshot = data;
+                else fetchedMain = data;
+            })
+            .catch((error) => console.error('Failed to refresh homepage data', error));
     });
 
     // Snapshots cached before Market pulse existed have no `marketPulse` at all.
