@@ -5,7 +5,7 @@
     import { buttonVariants } from '$lib/components/ui/button';
 
     /**
-     * A "Tip me" button for the bottom of the sidenav that opens Ko-fi's tip form in a dialog.
+     * A "Leave a tip" button for the bottom of the sidenav that opens Ko-fi's tip form in a dialog.
      *
      * This is the same page Ko-fi's floating-chat overlay script shows in its popup, without the
      * script itself: that pins its own button to the bottom-left of the screen, right over the
@@ -27,7 +27,7 @@
             class={buttonVariants({ class: `w-full min-h-10 max-h-10 justify-center gap-2 ${buttonClass}` })}
         >
             <SiKofi size={16} color="#72a4f2" />
-            <span class="text-sm">Tip me on Ko-fi</span>
+            <span class="text-sm">Leave a tip</span>
         </Dialog.Trigger>
     {:else}
         <Tooltip.Provider>
@@ -36,19 +36,22 @@
                     {#snippet child({ props })}
                         <Dialog.Trigger {...props} class={buttonVariants({ class: `h-9 w-9 p-0 ${buttonClass}` })}>
                             <SiKofi size={16} color="#72a4f2" />
-                            <span class="sr-only">Tip me on Ko-fi</span>
+                            <span class="sr-only">Leave a tip</span>
                         </Dialog.Trigger>
                     {/snippet}
                 </Tooltip.Trigger>
-                <Tooltip.Content side="right">Tip me on Ko-fi</Tooltip.Content>
+                <Tooltip.Content side="right">Leave a tip</Tooltip.Content>
             </Tooltip.Root>
         </Tooltip.Provider>
     {/if}
 
     <Dialog.Content class="max-w-[420px] gap-0 overflow-hidden p-0">
-        <Dialog.Title class="sr-only">Tip me on Ko-fi</Dialog.Title>
+        <Dialog.Title class="sr-only">Leave a tip</Dialog.Title>
         <Dialog.Description class="sr-only">Ko-fi's tip form, for supporting Aris Maye.</Dialog.Description>
-        <iframe src={formUrl} title="Tip me on Ko-fi" class="block h-[min(630px,85vh)] w-full border-0 bg-[#f9f9f9]"
+        <iframe
+            src={formUrl}
+            title="Leave a tip on Ko-fi"
+            class="block h-[min(630px,85vh)] w-full border-0 bg-[#f9f9f9]"
         ></iframe>
     </Dialog.Content>
 </Dialog.Root>
