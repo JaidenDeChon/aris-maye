@@ -45,9 +45,9 @@ const SNAPSHOT_COLLECTION = 'homepage-snapshots';
 /**
  * Bump whenever the snapshot's shape changes.
  *
- * Deploy previews share the production database, so without this a preview would read the snapshot
- * production's older code keeps writing, and the sections it adds would never appear. Each version
- * reads and writes its own document.
+ * Every deploy preview reads the same `osrsbox-dev` database, so without this a preview would read
+ * the snapshot another preview's older code wrote, and the sections it adds would never appear. Each
+ * version reads and writes its own document.
  */
 const SNAPSHOT_VERSION = 5;
 
