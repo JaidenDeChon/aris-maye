@@ -14,6 +14,8 @@
         "grab-osrsbox-items": "bun run --env-file .env scripts/grab-osrsbox-items.ts",
         "backfill-missing-items": "bun run --env-file .env scripts/backfill-missing-items.ts",
         "populate-item-ingredient-trees": "bun run --env-file .env scripts/populate-ingredients.ts",
+        "verify-used-in-index": "bun run --env-file .env scripts/verify-used-in-index.ts",
+        "verify-seo": "bun scripts/verify-seo.ts",
         "update-item-prices": "bun run --env-file .env scripts/run-update-item-prices.ts",
         "remove-duplicate-items": "bun run --env-file .env scripts/remove-duplicate-items.ts",
         "normalize-wiki-names": "bun run --env-file .env scripts/normalize-wiki-names.ts",
