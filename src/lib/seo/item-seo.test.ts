@@ -40,6 +40,26 @@ describe('isIndexableItem', () => {
     });
 });
 
+describe('item copies', () => {
+    // Noted, placeholder and duplicate copies carry the real item's recipes, so without this the
+    // index would hold several identical pages per item.
+    it.each([{ noted: true }, { placeholder: true }, { duplicate: true }])('never indexes a copy (%p)', (flags) => {
+        const item = makeItem({ creationSpecs: [smithingSpec as never], ...flags });
+        expect(isIndexableItem(item, 3)).toBe(false);
+        expect(buildItemSeo(item, usedIn(3, ['Iron bar'])).robots).toBe('noindex');
+    });
+
+    it('still indexes the real item', () => {
+        const item = makeItem({
+            creationSpecs: [smithingSpec as never],
+            noted: false,
+            placeholder: false,
+            duplicate: false,
+        });
+        expect(isIndexableItem(item, 0)).toBe(true);
+    });
+});
+
 describe('buildItemSeo', () => {
     it('names the skill and level for an item with a recipe', () => {
         const seo = buildItemSeo(makeItem({ creationSpecs: [smithingSpec as never] }), EMPTY_USED_IN);

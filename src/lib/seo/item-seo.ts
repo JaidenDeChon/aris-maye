@@ -15,11 +15,22 @@ export function hasRecipe(item: Pick<IOsrsboxItemWithMeta, 'creationSpecs'>): bo
     return (item.creationSpecs?.length ?? 0) > 0;
 }
 
+type IndexableFields = Pick<IOsrsboxItemWithMeta, 'creationSpecs' | 'noted' | 'placeholder' | 'duplicate'>;
+
+/**
+ * Noted, placeholder and duplicate copies of an item carry the real item's recipes. Indexing them
+ * would put several identical pages per item in search results.
+ */
+export function isItemCopy(item: Pick<IOsrsboxItemWithMeta, 'noted' | 'placeholder' | 'duplicate'>): boolean {
+    return item.noted === true || item.placeholder === true || item.duplicate === true;
+}
+
 /**
  * The only rule for whether an item page belongs in search results. The sitemap query selects
- * the same set, so the two must change together.
+ * the same set (`INDEXABLE_ITEM_FILTER` in the item service), so the two must change together.
  */
-export function isIndexableItem(item: Pick<IOsrsboxItemWithMeta, 'creationSpecs'>, usedInTotal: number): boolean {
+export function isIndexableItem(item: IndexableFields, usedInTotal: number): boolean {
+    if (isItemCopy(item)) return false;
     return hasRecipe(item) || usedInTotal > 0;
 }
 
@@ -109,6 +120,7 @@ function priceOnlySeo(item: IOsrsboxItemWithMeta, path: string): PageSeo {
 
 export function buildItemSeo(item: IOsrsboxItemWithMeta, usedIn: ItemUsedIn): PageSeo {
     const path = `/items/${item.id}`;
+    if (isItemCopy(item)) return priceOnlySeo(item, path);
     if (hasRecipe(item)) return recipeSeo(item, path);
     if (usedIn.total > 0) return ingredientSeo(item, usedIn, path);
     return priceOnlySeo(item, path);

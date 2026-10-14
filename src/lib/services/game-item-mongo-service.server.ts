@@ -8,6 +8,8 @@ import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
 import { skillSpellings } from '$lib/constants/skill-aliases';
 import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
+import { buildUsedIn, type RecipeDoc } from '$lib/helpers/item-used-in';
+import type { ItemUsedIn } from '$lib/models/item-used-in';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -303,9 +305,75 @@ export async function getGameItemById(itemId: string): Promise<IOsrsboxItemWithM
             wiki_name: 1,
             wiki_url: 1,
             wiki_page_title: 1,
+            // Read by `isIndexableItem`, which keeps noted and placeholder copies out of the index.
+            noted: 1,
+            placeholder: 1,
+            duplicate: 1,
+            // Enough of the recipes to title and describe the page, without the full tree.
+            'creationSpecs.requiredSkills': 1,
+            'creationSpecs.experienceGranted': 1,
+            'creationSpecs.ingredients': 1,
         })
         .lean<IOsrsboxItemWithMeta>()
         .exec();
+}
+
+/**
+ * Leaves out noted, placeholder and duplicate copies, which carry the real item's recipes. Matches
+ * `isItemCopy` in `$lib/seo/item-seo`.
+ */
+export const INDEXABLE_ITEM_FILTER = {
+    noted: { $ne: true },
+    placeholder: { $ne: true },
+    duplicate: { $ne: true },
+};
+
+/**
+ * The recipes that take this item as an ingredient, for the item page's "Used in" card.
+ * @param itemObjectId - The ingredient's Mongo `_id`, which is what recipes reference.
+ */
+export async function getRecipesUsingItem(itemObjectId: unknown): Promise<ItemUsedIn> {
+    const docs = await OsrsboxItemModel.find({
+        'creationSpecs.ingredients.item': itemObjectId,
+        _id: { $ne: itemObjectId },
+        ...INDEXABLE_ITEM_FILTER,
+    })
+        .select({
+            _id: 0,
+            id: 1,
+            name: 1,
+            icon: 1,
+            'creationSpecs.requiredSkills': 1,
+            'creationSpecs.ingredients.item': 1,
+        })
+        .lean<RecipeDoc[]>()
+        .exec();
+    return buildUsedIn(docs, String(itemObjectId));
+}
+
+/**
+ * Every item id whose page belongs in the sitemap: items with a recipe, plus items used as an
+ * ingredient. This must select the same set as `isIndexableItem`.
+ */
+export async function getIndexableItemIds(): Promise<number[]> {
+    const [craftable, ingredientRefs] = await Promise.all([
+        OsrsboxItemModel.find({ 'creationSpecs.0': { $exists: true }, ...INDEXABLE_ITEM_FILTER })
+            .select({ _id: 0, id: 1 })
+            .lean<{ id: number }[]>()
+            .exec(),
+        OsrsboxItemModel.distinct('creationSpecs.ingredients.item').exec(),
+    ]);
+    const ingredients = ingredientRefs.length
+        ? await OsrsboxItemModel.find({ _id: { $in: ingredientRefs }, ...INDEXABLE_ITEM_FILTER })
+              .select({ _id: 0, id: 1 })
+              .lean<{ id: number }[]>()
+              .exec()
+        : [];
+    const ids = new Set<number>();
+    for (const { id } of [...craftable, ...ingredients]) {
+        if (Number.isInteger(id)) ids.add(id);
+    }
+    return [...ids].sort((a, b) => a - b);
 }
 
 /**
