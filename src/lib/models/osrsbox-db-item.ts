@@ -176,6 +176,8 @@ export type IOsrsboxItemWithMeta = Pick<IOsrsboxItem, 'id' | 'name' | 'icon' | '
         buyLimit?: number | null;
         wikiName?: string | null;
         usedIn?: ItemUsedIn;
+        /** Set when other items share this name: the id of the one whose page is indexed. */
+        sameNamePrimaryId?: number | null;
     };
 
 export type RawOsrsboxItem = IOsrsboxItem;

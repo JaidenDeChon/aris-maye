@@ -10,6 +10,7 @@ import { skillSpellings } from '$lib/constants/skill-aliases';
 import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
 import { buildUsedIn, type RecipeDoc } from '$lib/helpers/item-used-in';
 import type { ItemUsedIn } from '$lib/models/item-used-in';
+import { keepOnePerName, pickPrimaryItemId, type PrimaryCandidate } from '$lib/seo/primary-item';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -351,29 +352,58 @@ export async function getRecipesUsingItem(itemObjectId: unknown): Promise<ItemUs
     return buildUsedIn(docs, String(itemObjectId));
 }
 
+const PRIMARY_FIELDS = { _id: 0, id: 1, name: 1, tradeable_on_ge: 1, highPrice: 1, lowPrice: 1 } as const;
+type PrimaryFields = PrimaryCandidate & { name: string };
+
 /**
  * Every item id whose page belongs in the sitemap: items with a recipe, plus items used as an
- * ingredient. This must select the same set as `isIndexableItem`.
+ * ingredient, keeping one item per name. This must select the same set as `isIndexableItem`.
  */
 export async function getIndexableItemIds(): Promise<number[]> {
     const [craftable, ingredientRefs] = await Promise.all([
         OsrsboxItemModel.find({ 'creationSpecs.0': { $exists: true }, ...INDEXABLE_ITEM_FILTER })
-            .select({ _id: 0, id: 1 })
-            .lean<{ id: number }[]>()
+            .select(PRIMARY_FIELDS)
+            .lean<PrimaryFields[]>()
             .exec(),
-        OsrsboxItemModel.distinct('creationSpecs.ingredients.item').exec(),
+        OsrsboxItemModel.distinct('creationSpecs.ingredients.item', INDEXABLE_ITEM_FILTER).exec(),
     ]);
     const ingredients = ingredientRefs.length
         ? await OsrsboxItemModel.find({ _id: { $in: ingredientRefs }, ...INDEXABLE_ITEM_FILTER })
-              .select({ _id: 0, id: 1 })
-              .lean<{ id: number }[]>()
+              .select(PRIMARY_FIELDS)
+              .lean<PrimaryFields[]>()
               .exec()
         : [];
-    const ids = new Set<number>();
-    for (const { id } of [...craftable, ...ingredients]) {
-        if (Number.isInteger(id)) ids.add(id);
+    const byId = new Map<number, PrimaryFields>();
+    for (const item of [...craftable, ...ingredients]) {
+        if (Number.isInteger(item.id)) byId.set(item.id, item);
     }
-    return [...ids].sort((a, b) => a - b);
+    return keepOnePerName([...byId.values()]);
+}
+
+/**
+ * When other indexable items share this item's name, the id of the one whose page is indexed;
+ * otherwise null. Only meaningful for an item that is itself indexable.
+ */
+export async function getSameNamePrimaryId(item: { id: number; name: string }): Promise<number | null> {
+    const namesakes = await OsrsboxItemModel.find({ name: item.name, ...INDEXABLE_ITEM_FILTER })
+        .select({ ...PRIMARY_FIELDS, _id: 1, 'creationSpecs.requiredSkills': 1 })
+        .lean<Array<PrimaryFields & { _id: unknown; creationSpecs?: unknown[] }>>()
+        .exec();
+    if (namesakes.length < 2) return null;
+
+    // Namesakes count only if their own page is indexable, matching how the sitemap groups them.
+    const candidates: PrimaryFields[] = [];
+    for (const namesake of namesakes) {
+        const indexable =
+            namesake.id === item.id ||
+            (namesake.creationSpecs?.length ?? 0) > 0 ||
+            (await OsrsboxItemModel.exists({
+                'creationSpecs.ingredients.item': namesake._id,
+                ...INDEXABLE_ITEM_FILTER,
+            })) !== null;
+        if (indexable) candidates.push(namesake);
+    }
+    return candidates.length < 2 ? null : pickPrimaryItemId(candidates);
 }
 
 /**

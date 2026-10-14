@@ -12,7 +12,7 @@ import { startMongo } from '../src/db/mongo';
 // the model is imported (hence the dynamic imports), so this script only writes when asked to.
 mongoose.set('autoIndex', false);
 const { OsrsboxItemModel } = await import('../src/lib/models/mongo-schemas/osrsbox-db-item-schema');
-const { INDEXABLE_ITEM_FILTER, getIndexableItemIds, getRecipesUsingItem } =
+const { INDEXABLE_ITEM_FILTER, getIndexableItemIds, getRecipesUsingItem, getSameNamePrimaryId } =
     await import('../src/lib/services/game-item-mongo-service.server');
 
 const INDEX_NAME = 'creationSpecs.ingredients.item_1';
@@ -65,6 +65,17 @@ const copies = await OsrsboxItemModel.countDocuments({
 console.log(`Copies among indexable items: ${copies}`);
 if (copies > 0) failures.push(`${copies} noted/placeholder/duplicate copies are in the sitemap set.`);
 
+// Items that share a name: only one is indexed, and it's the one on the Grand Exchange.
+const rangingPrimary = await getSameNamePrimaryId({ id: 23553, name: 'Ranging potion(3)' });
+console.log(`Ranging potion(3): indexed page is #${rangingPrimary}`);
+if (rangingPrimary !== 169) failures.push(`Ranging potion(3) should index #169, got #${rangingPrimary}.`);
+const indexedNames = await OsrsboxItemModel.find({ id: { $in: indexable } })
+    .select({ _id: 0, name: 1 })
+    .lean();
+const repeatedNames = indexedNames.length - new Set(indexedNames.map((i) => i.name)).size;
+console.log(`Names repeated among indexable items: ${repeatedNames}`);
+if (repeatedNames > 0) failures.push(`${repeatedNames} names appear more than once in the sitemap set.`);
+
 // A few pages that should be noindex, for the full-site audit: plain items and copies.
 const ingredientRefs = await OsrsboxItemModel.distinct('creationSpecs.ingredients.item');
 const plain = await OsrsboxItemModel.find({
@@ -79,7 +90,7 @@ const copySample = await OsrsboxItemModel.find({ 'creationSpecs.0': { $exists: t
     .select({ _id: 0, id: 1 })
     .limit(3)
     .lean<{ id: number }[]>();
-console.log(`--noindex-ids=${[...plain, ...copySample].map((p) => p.id).join(',')}`);
+console.log(`--noindex-ids=${[...plain, ...copySample, { id: 23553 }].map((p) => p.id).join(',')}`);
 
 await mongoose.disconnect();
 

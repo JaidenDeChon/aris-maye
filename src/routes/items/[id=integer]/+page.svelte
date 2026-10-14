@@ -226,8 +226,9 @@
                 throw new Error(message || 'Failed to refresh item.');
             }
             const updated = (await resp.json()) as IOsrsboxItemWithMeta;
-            // The edit endpoint doesn't carry "Used in", so keep what the page already has.
-            gameItem = { ...updated, usedIn: gameItem?.usedIn };
+            // The edit endpoint doesn't carry "Used in" or the namesake check, so keep what the page
+            // already has.
+            gameItem = { ...updated, usedIn: gameItem?.usedIn, sameNamePrimaryId: gameItem?.sameNamePrimaryId };
             if (updated?.id !== null && updated?.id !== undefined) {
                 // The item was just re-read from the source of truth, so the cached tree for it
                 // is stale by definition.

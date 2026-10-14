@@ -15,7 +15,15 @@ export function hasRecipe(item: Pick<IOsrsboxItemWithMeta, 'creationSpecs'>): bo
     return (item.creationSpecs?.length ?? 0) > 0;
 }
 
-type IndexableFields = Pick<IOsrsboxItemWithMeta, 'creationSpecs' | 'noted' | 'placeholder' | 'duplicate'>;
+type IndexableFields = Pick<
+    IOsrsboxItemWithMeta,
+    'id' | 'creationSpecs' | 'noted' | 'placeholder' | 'duplicate' | 'sameNamePrimaryId'
+>;
+
+/** True when another item with the same name is the one indexed (see `pickPrimaryItemId`). */
+function isSecondaryForName(item: Pick<IOsrsboxItemWithMeta, 'id' | 'sameNamePrimaryId'>): boolean {
+    return item.sameNamePrimaryId != null && item.sameNamePrimaryId !== item.id;
+}
 
 /**
  * Noted, placeholder and duplicate copies of an item carry the real item's recipes. Indexing them
@@ -30,7 +38,7 @@ export function isItemCopy(item: Pick<IOsrsboxItemWithMeta, 'noted' | 'placehold
  * the same set (`INDEXABLE_ITEM_FILTER` in the item service), so the two must change together.
  */
 export function isIndexableItem(item: IndexableFields, usedInTotal: number): boolean {
-    if (isItemCopy(item)) return false;
+    if (isItemCopy(item) || isSecondaryForName(item)) return false;
     return hasRecipe(item) || usedInTotal > 0;
 }
 
@@ -120,7 +128,7 @@ function priceOnlySeo(item: IOsrsboxItemWithMeta, path: string): PageSeo {
 
 export function buildItemSeo(item: IOsrsboxItemWithMeta, usedIn: ItemUsedIn): PageSeo {
     const path = `/items/${item.id}`;
-    if (isItemCopy(item)) return priceOnlySeo(item, path);
+    if (isItemCopy(item) || isSecondaryForName(item)) return priceOnlySeo(item, path);
     if (hasRecipe(item)) return recipeSeo(item, path);
     if (usedIn.total > 0) return ingredientSeo(item, usedIn, path);
     return priceOnlySeo(item, path);

@@ -60,6 +60,18 @@ describe('item copies', () => {
     });
 });
 
+describe('items that share a name', () => {
+    it('indexes only the primary item for the name', () => {
+        const spec = [smithingSpec as never];
+        const secondary = makeItem({ id: 23553, creationSpecs: spec, sameNamePrimaryId: 169 });
+        expect(isIndexableItem(secondary, 0)).toBe(false);
+        expect(buildItemSeo(secondary, EMPTY_USED_IN).robots).toBe('noindex');
+
+        const primary = makeItem({ id: 169, creationSpecs: spec, sameNamePrimaryId: 169 });
+        expect(isIndexableItem(primary, 0)).toBe(true);
+    });
+});
+
 describe('buildItemSeo', () => {
     it('names the skill and level for an item with a recipe', () => {
         const seo = buildItemSeo(makeItem({ creationSpecs: [smithingSpec as never] }), EMPTY_USED_IN);
