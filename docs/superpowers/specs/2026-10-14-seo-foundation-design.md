@@ -20,7 +20,7 @@ have enough on them to deserve indexing.
 
 | Decision                | Choice                                                                                                                                 |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Production origin       | `https://aris-maye.com`, read from `PUBLIC_SITE_URL` with that as the default                                                          |
+| Production origin       | `https://aris-maye.com`, read from `VITE_SITE_URL` with that as the default                                                            |
 | Indexable item pages    | Items with at least one creation recipe, **plus** every item used as an ingredient in a recipe                                         |
 | Other item pages        | Reachable, but `noindex`                                                                                                               |
 | Non-production hosts    | Everything `noindex` (header + robots.txt `Disallow: /`)                                                                               |
@@ -63,7 +63,7 @@ Rules:
     - Skill page: "The most profitable things to make with {Skill} in OSRS, ranked by live GE prices and
       filtered to your levels."
     - When a sentence would run past 160 characters, drop clauses from the end, not mid-sentence.
-- Canonical is `PUBLIC_SITE_URL` + pathname, with no query string and no trailing slash (except `/`).
+- Canonical is `VITE_SITE_URL` + pathname, with no query string and no trailing slash (except `/`).
 - `og:title`, `og:description`, `og:url` and `twitter:*` mirror the above. `og:image` stays
   `/other-images/share-thumb.png` until PR 2.
 - The layout keeps only the tags that are the same on every page (`og:site_name`, `og:type`,
@@ -74,17 +74,17 @@ Rules:
 
 All new pure code lives in `src/lib/seo/`, so it can be unit tested without Svelte or Mongo.
 
-| Unit                                           | Purpose                                                                                                                                               |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `site-url.ts`                                  | `SITE_URL` (from `PUBLIC_SITE_URL`, default `https://aris-maye.com`); `isProductionHost(host)`, true only for `aris-maye.com` and `www.aris-maye.com` |
-| `page-seo.ts`                                  | `type PageSeo = { title, description, canonicalPath, robots: 'index' \| 'noindex', image? }`; `canonicalUrl(path)`                                    |
-| `item-seo.ts`                                  | `buildItemSeo(item, usedIn)`, `buildItemNotFoundSeo()`, `isIndexableItem(item, usedInCount)`                                                          |
-| `static-page-seo.ts`                           | builders for `/`, `/items`, skill pages and the noindex personal pages                                                                                |
-| `fit-text.ts`                                  | the title/description length rules (drop segments, never cut a word in half)                                                                          |
-| `sitemap.ts`                                   | `buildSitemap(urls): string`, `buildSitemapIndex(sitemapUrls): string`, `chunkSitemapUrls(urls, max = 50000)`                                         |
-| `robots.ts`                                    | `buildRobots(host): string`                                                                                                                           |
-| `src/lib/components/global/seo-head.svelte`    | renders one `PageSeo` into `<svelte:head>`: title, description, canonical, robots meta, og/twitter title/description/url/image                        |
-| `src/lib/components/items/item-used-in.svelte` | the "Used in" card                                                                                                                                    |
+| Unit                                           | Purpose                                                                                                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `site-url.ts`                                  | `SITE_URL` (from `VITE_SITE_URL`, default `https://aris-maye.com`); `isProductionHost(host)`, true only for `aris-maye.com` and `www.aris-maye.com` |
+| `page-seo.ts`                                  | `type PageSeo = { title, description, canonicalPath, robots: 'index' \| 'noindex', image? }`; `canonicalUrl(path)`                                  |
+| `item-seo.ts`                                  | `buildItemSeo(item, usedIn)`, `buildItemNotFoundSeo()`, `isIndexableItem(item, usedInCount)`                                                        |
+| `static-page-seo.ts`                           | builders for `/`, `/items`, skill pages and the noindex personal pages                                                                              |
+| `fit-text.ts`                                  | the title/description length rules (drop segments, never cut a word in half)                                                                        |
+| `sitemap.ts`                                   | `buildSitemap(urls): string`, `buildSitemapIndex(sitemapUrls): string`, `chunkSitemapUrls(urls, max = 50000)`                                       |
+| `robots.ts`                                    | `buildRobots(host): string`                                                                                                                         |
+| `src/lib/components/global/seo-head.svelte`    | renders one `PageSeo` into `<svelte:head>`: title, description, canonical, robots meta, og/twitter title/description/url/image                      |
+| `src/lib/components/items/item-used-in.svelte` | the "Used in" card                                                                                                                                  |
 
 `isIndexableItem` is the only rule for item indexability. The item page's robots tag and the sitemap
 query must agree with it, and the tests hold them to that.
