@@ -202,6 +202,10 @@ async function auditIndexable(loc: string) {
 
     // Ingredient-only pages exist in the index because of their "Used in" card, so it must be in
     // the server-rendered HTML that crawlers read.
+    // "including X and Y" must name two different recipes.
+    const including = description.match(/including (.+) and (.+?)\. /);
+    check(!including || including[1] !== including[2], `${path}: description repeats "${including?.[1]}"`);
+
     if (/ is used (in \d+|to make) /.test(description)) {
         ingredientPages++;
         check(head.usedIn, `${path}: ingredient page has no Used in card in its server render`);

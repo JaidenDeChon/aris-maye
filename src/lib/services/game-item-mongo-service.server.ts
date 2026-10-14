@@ -9,6 +9,7 @@ import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
 import { skillSpellings } from '$lib/constants/skill-aliases';
 import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
 import { buildUsedIn, type RecipeDoc } from '$lib/helpers/item-used-in';
+import { pickIndexableNamesakes } from '$lib/helpers/game-item-payload';
 import type { ItemUsedIn } from '$lib/models/item-used-in';
 import { keepOnePerName, pickPrimaryItemId, type PrimaryCandidate } from '$lib/seo/primary-item';
 
@@ -344,6 +345,7 @@ export async function getRecipesUsingItem(itemObjectId: unknown): Promise<ItemUs
             id: 1,
             name: 1,
             icon: 1,
+            tradeable_on_ge: 1,
             'creationSpecs.requiredSkills': 1,
             'creationSpecs.ingredients.item': 1,
         })
@@ -352,8 +354,9 @@ export async function getRecipesUsingItem(itemObjectId: unknown): Promise<ItemUs
     return buildUsedIn(docs, String(itemObjectId));
 }
 
-const PRIMARY_FIELDS = { _id: 0, id: 1, name: 1, tradeable_on_ge: 1, highPrice: 1, lowPrice: 1 } as const;
+const PRIMARY_FIELDS = { _id: 0, id: 1, name: 1, tradeable_on_ge: 1 } as const;
 type PrimaryFields = PrimaryCandidate & { name: string };
+type NamesakeDoc = PrimaryFields & { _id: unknown; creationSpecs?: unknown[] };
 
 /**
  * Every item id whose page belongs in the sitemap: items with a recipe, plus items used as an
@@ -387,22 +390,21 @@ export async function getIndexableItemIds(): Promise<number[]> {
 export async function getSameNamePrimaryId(item: { id: number; name: string }): Promise<number | null> {
     const namesakes = await OsrsboxItemModel.find({ name: item.name, ...INDEXABLE_ITEM_FILTER })
         .select({ ...PRIMARY_FIELDS, _id: 1, 'creationSpecs.requiredSkills': 1 })
-        .lean<Array<PrimaryFields & { _id: unknown; creationSpecs?: unknown[] }>>()
+        .lean<NamesakeDoc[]>()
         .exec();
     if (namesakes.length < 2) return null;
 
-    // Namesakes count only if their own page is indexable, matching how the sitemap groups them.
-    const candidates: PrimaryFields[] = [];
-    for (const namesake of namesakes) {
-        const indexable =
-            namesake.id === item.id ||
-            (namesake.creationSpecs?.length ?? 0) > 0 ||
-            (await OsrsboxItemModel.exists({
-                'creationSpecs.ingredients.item': namesake._id,
-                ...INDEXABLE_ITEM_FILTER,
-            })) !== null;
-        if (indexable) candidates.push(namesake);
-    }
+    // One query for which recipe-less namesakes are used as ingredients, rather than one per
+    // namesake: some names ("Bone in vinegar") are shared by dozens of items.
+    const recipeLess = namesakes.filter((n) => !(n.creationSpecs?.length ?? 0)).map((n) => n._id);
+    const usedAsIngredient = recipeLess.length
+        ? await OsrsboxItemModel.distinct('creationSpecs.ingredients.item', {
+              'creationSpecs.ingredients.item': { $in: recipeLess },
+              ...INDEXABLE_ITEM_FILTER,
+          }).exec()
+        : [];
+
+    const candidates = pickIndexableNamesakes(namesakes, item.id, new Set(usedAsIngredient.map(String)));
     return candidates.length < 2 ? null : pickPrimaryItemId(candidates);
 }
 

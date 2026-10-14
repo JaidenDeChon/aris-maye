@@ -19,6 +19,14 @@ describe('SEO coverage', () => {
         expect(source).toMatch(/<SeoHead\s/);
     });
 
+    // Without it, a 404 has no <title> at all now that the layout doesn't set one.
+    it('gives the error page a noindex SeoHead', () => {
+        const source = readFileSync(join(routesDir, '+error.svelte'), 'utf8');
+        expect(source).toContain("import SeoHead from '$lib/components/global/seo-head.svelte'");
+        expect(source).toMatch(/<SeoHead\s/);
+        expect(source).toContain("robots: 'noindex'");
+    });
+
     it('leaves per-page tags out of the layout, so none appear twice', () => {
         const layout = readFileSync(join(routesDir, '+layout.svelte'), 'utf8');
         for (const tag of [

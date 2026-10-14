@@ -1,10 +1,12 @@
 import { EMPTY_USED_IN, USED_IN_LIMIT, type ItemUsedIn, type UsedInRecipe } from '$lib/models/item-used-in';
+import { pickPrimaryItemId } from '$lib/seo/primary-item';
 
 /** The slice of an item document the "Used in" query reads. */
 export type RecipeDoc = {
     id: number;
     name: string;
     icon?: string | null;
+    tradeable_on_ge?: boolean | null;
     creationSpecs?: Array<{
         requiredSkills?: Array<{ skillName?: string; skillLevel?: number }>;
         ingredients?: Array<{ item: unknown }>;
@@ -34,12 +36,15 @@ function compareUsedIn(a: UsedInRecipe, b: UsedInRecipe): number {
 }
 
 export function buildUsedIn(docs: RecipeDoc[], ingredientId: string, limit = USED_IN_LIMIT): ItemUsedIn {
-    const seen = new Set<number>();
+    // Several items can share a recipe's name (minigame copies of a potion, say). List the name
+    // once, linking to the one whose page is indexed, so the count and the description don't
+    // repeat it.
+    const byName = new Map<string, RecipeDoc[]>();
+    for (const doc of docs) byName.set(doc.name, [...(byName.get(doc.name) ?? []), doc]);
     const rows: UsedInRecipe[] = [];
-    for (const doc of docs) {
-        if (seen.has(doc.id)) continue;
-        seen.add(doc.id);
-        rows.push(toUsedInRecipe(doc, ingredientId));
+    for (const namesakes of byName.values()) {
+        const primaryId = pickPrimaryItemId(namesakes);
+        rows.push(toUsedInRecipe(namesakes.find((doc) => doc.id === primaryId)!, ingredientId));
     }
     rows.sort(compareUsedIn);
     return { items: rows.slice(0, limit), total: rows.length };

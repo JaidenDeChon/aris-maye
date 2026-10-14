@@ -5,19 +5,21 @@ describe('pickPrimaryItemId', () => {
     it('prefers the GE-tradeable item, since that is the one players search for', () => {
         expect(
             pickPrimaryItemId([
-                { id: 23553, tradeable_on_ge: false, highPrice: null },
-                { id: 169, tradeable_on_ge: true, highPrice: 400 },
+                { id: 23553, tradeable_on_ge: false },
+                { id: 169, tradeable_on_ge: true },
             ]),
         ).toBe(169);
     });
 
-    it('then prefers an item with a live price', () => {
-        expect(
-            pickPrimaryItemId([
-                { id: 10, tradeable_on_ge: true, highPrice: null, lowPrice: null },
-                { id: 20, tradeable_on_ge: true, highPrice: null, lowPrice: 5 },
-            ]),
-        ).toBe(20);
+    // Live prices change hourly; a choice that followed them could flip a URL Google just read
+    // from the sitemap to noindex.
+    it('ignores live prices, so the choice stays put from hour to hour', () => {
+        const quiet = { id: 10, tradeable_on_ge: true, highPrice: null, lowPrice: null };
+        const traded = { id: 20, tradeable_on_ge: true, highPrice: 900, lowPrice: 850 };
+        const nextHourQuiet = { ...quiet, highPrice: 5 };
+        const nextHourTraded = { ...traded, highPrice: null, lowPrice: null };
+        expect(pickPrimaryItemId([quiet, traded])).toBe(10);
+        expect(pickPrimaryItemId([nextHourQuiet, nextHourTraded])).toBe(10);
     });
 
     it('falls back to the lowest id', () => {

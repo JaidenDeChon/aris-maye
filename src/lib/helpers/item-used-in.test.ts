@@ -56,6 +56,24 @@ describe('buildUsedIn', () => {
     });
 });
 
+describe('buildUsedIn with items that share a name', () => {
+    const spec = [{ requiredSkills: [{ skillName: 'Herblore', skillLevel: 38 }], ingredients: [{ item: ORE }] }];
+
+    // Otherwise descriptions read "including Prayer potion(1) and Prayer potion(1)".
+    it('lists each recipe name once, linking to the indexed item', () => {
+        const result = buildUsedIn(
+            [
+                { id: 23251, name: 'Prayer potion(1)', icon: null, tradeable_on_ge: false, creationSpecs: spec },
+                { id: 143, name: 'Prayer potion(1)', icon: null, tradeable_on_ge: true, creationSpecs: spec },
+                { id: 139, name: 'Prayer potion(3)', icon: null, tradeable_on_ge: true, creationSpecs: spec },
+            ],
+            ORE,
+        );
+        expect(result.items.map((r) => r.id)).toEqual([143, 139]);
+        expect(result.total).toBe(2);
+    });
+});
+
 describe('loadUsedInSafely', () => {
     it('falls back to empty when the lookup fails, so the item page still loads', async () => {
         const result = await loadUsedInSafely(async () => {
