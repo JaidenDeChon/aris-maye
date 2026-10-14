@@ -1,4 +1,5 @@
 import type { Types } from 'mongoose';
+import type { ItemUsedIn } from './item-used-in';
 
 /**
  * Represents the amount of experience in a given skill awarded for creating an item.
@@ -174,6 +175,7 @@ export type IOsrsboxItemWithMeta = Pick<IOsrsboxItem, 'id' | 'name' | 'icon' | '
         lowTime?: number | null;
         buyLimit?: number | null;
         wikiName?: string | null;
+        usedIn?: ItemUsedIn;
     };
 
 export type RawOsrsboxItem = IOsrsboxItem;
