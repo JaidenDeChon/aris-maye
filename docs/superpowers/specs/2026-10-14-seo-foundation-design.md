@@ -214,6 +214,29 @@ This is done by Claude with a browser tool if one is connected, and is otherwise
 - Use URL Inspection on one craftable page, one ingredient-only page and one noindex page.
 - Check that the sitemap's discovered-URL count matches the audit's count.
 
+## Decisions made during implementation
+
+Real data showed cases the design above didn't anticipate. The code follows these, and they take
+precedence over the sections above where the two differ.
+
+- **Copies are never indexed.** 5,547 of the 9,736 items with recipes are noted, placeholder or
+  `duplicate` copies carrying the real item's recipes (for example Iron bar 2351, noted 2352,
+  placeholder 13887). `isItemCopy` and `INDEXABLE_ITEM_FILTER` keep them out of the sitemap and
+  out of "Used in", and their pages are noindex.
+- **One indexed page per item name.** 322 names were shared by 881 indexable pages (lit and
+  unlit lanterns, minigame copies of potions). Only one per name is indexed: the GE-tradeable
+  one, then the lowest id. Live prices are deliberately not part of this choice, so it can't
+  change from hour to hour. `pickPrimaryItemId` decides it, for both the sitemap and the item
+  page.
+- **"Used in" lists each recipe name once**, linking to that name's indexed item. `total` counts
+  distinct names.
+- **`/api/game-item?fields=price`** skips the "Used in" and namesake lookups. The item page uses
+  it for the nature rune's price.
+- **`+error.svelte`** renders a noindex title, because the layout no longer sets one.
+- **Env var:** `VITE_SITE_URL`, not `PUBLIC_SITE_URL` (see the plan).
+
+Result on the `osrsbox` database: 4,898 indexable item pages, 4,906 sitemap URLs in total.
+
 ## Out of scope
 
 - OG images (PR 2), so `og:image` stays the static thumbnail.
