@@ -1,5 +1,10 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { getGameItemById } from '$lib/services/game-item-mongo-service.server';
+import {
+    getGameItemById,
+    getRecipesUsingItem,
+    getSameNamePrimaryId,
+} from '$lib/services/game-item-mongo-service.server';
+import { loadGameItemPayload } from '$lib/helpers/game-item-payload';
 
 export const GET: RequestHandler = async ({ url }) => {
     const id = url.searchParams.get('id');
@@ -7,12 +12,16 @@ export const GET: RequestHandler = async ({ url }) => {
         return new Response('Missing "id" query parameter.', { status: 400 });
     }
 
-    const item = await getGameItemById(id);
-    if (!item) {
+    const payload = await loadGameItemPayload(
+        id,
+        { priceOnly: url.searchParams.get('fields') === 'price' },
+        { getItem: getGameItemById, getUsedIn: getRecipesUsingItem, getSameNamePrimaryId },
+    );
+    if (!payload) {
         return new Response('Item not found.', { status: 404 });
     }
 
-    return new Response(JSON.stringify(item), {
+    return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
     });

@@ -1,4 +1,6 @@
 <script lang="ts">
+    import SeoHead from '$lib/components/global/seo-head.svelte';
+    import { myCharacterSeo } from '$lib/seo/static-page-seo';
     import { onMount } from 'svelte';
     import { toast } from 'svelte-sonner';
     import { Loader2Icon, Plus, Trash2 } from 'lucide-svelte';
@@ -351,6 +353,8 @@
         updateSuppliesForCharacter(activeCharacterId, (items) => items.filter((entry) => Number(entry.id) !== id));
     }
 </script>
+
+<SeoHead seo={myCharacterSeo} />
 
 <div class="content-sizing pt-6 pb-10 space-y-8">
     <header class="space-y-2">

@@ -8,6 +8,10 @@ import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import { geSaleAfterTaxExpr } from '$lib/constants/ge-tax';
 import { skillSpellings } from '$lib/constants/skill-aliases';
 import { cheapestShopPrice, type ShopSellTerms } from '$lib/helpers/store-price';
+import { buildUsedIn, type RecipeDoc } from '$lib/helpers/item-used-in';
+import { pickIndexableNamesakes } from '$lib/helpers/game-item-payload';
+import type { ItemUsedIn } from '$lib/models/item-used-in';
+import { keepOnePerName, pickPrimaryItemId, type PrimaryCandidate } from '$lib/seo/primary-item';
 
 type GameItemDoc = OsrsboxItemDocument & {
     _id: Types.ObjectId;
@@ -303,9 +307,105 @@ export async function getGameItemById(itemId: string): Promise<IOsrsboxItemWithM
             wiki_name: 1,
             wiki_url: 1,
             wiki_page_title: 1,
+            // Read by `isIndexableItem`, which keeps noted and placeholder copies out of the index.
+            noted: 1,
+            placeholder: 1,
+            duplicate: 1,
+            // Enough of the recipes to title and describe the page, without the full tree.
+            'creationSpecs.requiredSkills': 1,
+            'creationSpecs.experienceGranted': 1,
+            'creationSpecs.ingredients': 1,
         })
         .lean<IOsrsboxItemWithMeta>()
         .exec();
+}
+
+/**
+ * Leaves out noted, placeholder and duplicate copies, which carry the real item's recipes. Matches
+ * `isItemCopy` in `$lib/seo/item-seo`.
+ */
+export const INDEXABLE_ITEM_FILTER = {
+    noted: { $ne: true },
+    placeholder: { $ne: true },
+    duplicate: { $ne: true },
+};
+
+/**
+ * The recipes that take this item as an ingredient, for the item page's "Used in" card.
+ * @param itemObjectId - The ingredient's Mongo `_id`, which is what recipes reference.
+ */
+export async function getRecipesUsingItem(itemObjectId: unknown): Promise<ItemUsedIn> {
+    const docs = await OsrsboxItemModel.find({
+        'creationSpecs.ingredients.item': itemObjectId,
+        _id: { $ne: itemObjectId },
+        ...INDEXABLE_ITEM_FILTER,
+    })
+        .select({
+            _id: 0,
+            id: 1,
+            name: 1,
+            icon: 1,
+            tradeable_on_ge: 1,
+            'creationSpecs.requiredSkills': 1,
+            'creationSpecs.ingredients.item': 1,
+        })
+        .lean<RecipeDoc[]>()
+        .exec();
+    return buildUsedIn(docs, String(itemObjectId));
+}
+
+const PRIMARY_FIELDS = { _id: 0, id: 1, name: 1, tradeable_on_ge: 1 } as const;
+type PrimaryFields = PrimaryCandidate & { name: string };
+type NamesakeDoc = PrimaryFields & { _id: unknown; creationSpecs?: unknown[] };
+
+/**
+ * Every item id whose page belongs in the sitemap: items with a recipe, plus items used as an
+ * ingredient, keeping one item per name. This must select the same set as `isIndexableItem`.
+ */
+export async function getIndexableItemIds(): Promise<number[]> {
+    const [craftable, ingredientRefs] = await Promise.all([
+        OsrsboxItemModel.find({ 'creationSpecs.0': { $exists: true }, ...INDEXABLE_ITEM_FILTER })
+            .select(PRIMARY_FIELDS)
+            .lean<PrimaryFields[]>()
+            .exec(),
+        OsrsboxItemModel.distinct('creationSpecs.ingredients.item', INDEXABLE_ITEM_FILTER).exec(),
+    ]);
+    const ingredients = ingredientRefs.length
+        ? await OsrsboxItemModel.find({ _id: { $in: ingredientRefs }, ...INDEXABLE_ITEM_FILTER })
+              .select(PRIMARY_FIELDS)
+              .lean<PrimaryFields[]>()
+              .exec()
+        : [];
+    const byId = new Map<number, PrimaryFields>();
+    for (const item of [...craftable, ...ingredients]) {
+        if (Number.isInteger(item.id)) byId.set(item.id, item);
+    }
+    return keepOnePerName([...byId.values()]);
+}
+
+/**
+ * When other indexable items share this item's name, the id of the one whose page is indexed;
+ * otherwise null. Only meaningful for an item that is itself indexable.
+ */
+export async function getSameNamePrimaryId(item: { id: number; name: string }): Promise<number | null> {
+    const namesakes = await OsrsboxItemModel.find({ name: item.name, ...INDEXABLE_ITEM_FILTER })
+        .select({ ...PRIMARY_FIELDS, _id: 1, 'creationSpecs.requiredSkills': 1 })
+        .lean<NamesakeDoc[]>()
+        .exec();
+    if (namesakes.length < 2) return null;
+
+    // One query for which recipe-less namesakes are used as ingredients, rather than one per
+    // namesake: some names ("Bone in vinegar") are shared by dozens of items.
+    const recipeLess = namesakes.filter((n) => !(n.creationSpecs?.length ?? 0)).map((n) => n._id);
+    const usedAsIngredient = recipeLess.length
+        ? await OsrsboxItemModel.distinct('creationSpecs.ingredients.item', {
+              'creationSpecs.ingredients.item': { $in: recipeLess },
+              ...INDEXABLE_ITEM_FILTER,
+          }).exec()
+        : [];
+
+    const candidates = pickIndexableNamesakes(namesakes, item.id, new Set(usedAsIngredient.map(String)));
+    return candidates.length < 2 ? null : pickPrimaryItemId(candidates);
 }
 
 /**

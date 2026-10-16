@@ -9,8 +9,12 @@
 // `wiki_name` 404s. Around 8,300 of ~28,700 items are affected.
 //
 // This pass derives the real title from `wiki_url` and stores it alongside the
-// original fields, which are left untouched. It is idempotent: running it twice is a
-// no-op, and it only writes documents whose derived values actually differ.
+// original fields, which are left untouched. Items the game has renamed since the
+// OSRSBox snapshot (`ITEM_RENAMES`) are the exception: they take their new name,
+// `wiki_name` and `wiki_url`, because the old page no longer has their recipe.
+//
+// It is idempotent: running it twice is a no-op, and it only writes documents whose
+// derived values actually differ.
 //
 // Run with:
 //   bun run normalize-wiki-names
@@ -20,6 +24,7 @@ import mongoose from 'mongoose';
 import consola from 'consola';
 import { OsrsboxItemModel } from '../src/lib/models/mongo-schemas/osrsbox-db-item-schema';
 import { deriveWikiPageIdentity } from '../src/lib/helpers/wiki-page-title';
+import { applyItemRename } from '../src/lib/helpers/item-renames';
 
 const logger = consola.create({ defaults: { tag: 'normalize-wiki-names' } });
 
@@ -62,6 +67,8 @@ type NormalizeReport = {
     behaviourChanged: number;
     /** Documents carrying an infobox version label. */
     versioned: number;
+    /** Of `changed`, the documents given their current in-game name (`ITEM_RENAMES`). */
+    renames: number;
 };
 
 /**
@@ -81,6 +88,7 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
     let written = 0;
     let versioned = 0;
     let behaviourChanged = 0;
+    let renames = 0;
     let operations: mongoose.AnyBulkWriteOperation[] = [];
     const samples: string[] = [];
 
@@ -96,11 +104,16 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
     for await (const doc of cursor) {
         scanned += 1;
 
-        const { wikiPageTitle, wikiVersion } = deriveWikiPageIdentity(doc);
+        // An item the game has renamed takes its new name and wiki page first, so the
+        // title derived below is the page that still documents its recipe.
+        const current = applyItemRename(doc);
+        const renamed = current !== doc;
+
+        const { wikiPageTitle, wikiVersion } = deriveWikiPageIdentity(current);
         if (wikiVersion) versioned += 1;
 
         const alreadyCorrect =
-            (doc.wiki_page_title ?? null) === wikiPageTitle && (doc.wiki_version ?? null) === wikiVersion;
+            !renamed && (doc.wiki_page_title ?? null) === wikiPageTitle && (doc.wiki_version ?? null) === wikiVersion;
         if (alreadyCorrect) continue;
 
         changed += 1;
@@ -110,14 +123,21 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
         if (wikiPageTitle !== (doc.wiki_name ?? null)) behaviourChanged += 1;
 
         // Surface a few real corrections so a dry run is actually informative.
-        if (samples.length < 15 && wikiVersion && wikiPageTitle !== doc.wiki_name) {
+        if (renamed) {
+            renames += 1;
+            logger.info(`  id=${doc.id} renamed "${doc.name}" -> "${current.name}"`);
+        } else if (samples.length < 15 && wikiVersion && wikiPageTitle !== doc.wiki_name) {
             samples.push(`  id=${doc.id} "${doc.wiki_name}" -> "${wikiPageTitle}" (version: ${wikiVersion})`);
         }
+
+        const renameFields = renamed
+            ? { name: current.name, wiki_name: current.wiki_name, wiki_url: current.wiki_url }
+            : {};
 
         operations.push({
             updateOne: {
                 filter: { _id: doc._id },
-                update: { $set: { wiki_page_title: wikiPageTitle, wiki_version: wikiVersion } },
+                update: { $set: { ...renameFields, wiki_page_title: wikiPageTitle, wiki_version: wikiVersion } },
             },
         });
 
@@ -130,7 +150,7 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
         logger.info(`Example corrections:\n${samples.join('\n')}`);
     }
 
-    return { scanned, changed, written, behaviourChanged, versioned };
+    return { scanned, changed, written, behaviourChanged, versioned, renames };
 }
 
 (async function main() {
@@ -142,7 +162,7 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
         logger.success('Connection established.');
 
         const report = await normalizeWikiNames();
-        const { scanned, changed, written, behaviourChanged, versioned } = report;
+        const { scanned, changed, written, behaviourChanged, versioned, renames } = report;
 
         // Report both numbers explicitly. On a first run `changed` is essentially the whole
         // collection, because `wiki_page_title` / `wiki_version` do not exist yet and every
@@ -155,6 +175,7 @@ async function normalizeWikiNames(): Promise<NormalizeReport> {
                 `Documents ${DRY_RUN ? 'that would be written' : 'written'} ......... ${DRY_RUN ? changed : written}`,
                 `  - new fields only, same title ......... ${unchangedTitles}  (no behaviour change)`,
                 `  - resolve to a different wiki page .... ${behaviourChanged}  (the actual fix)`,
+                `  - of those, renamed by the game ....... ${renames}`,
                 `Items carrying an infobox version ....... ${versioned}`,
             ].join('\n'),
         );

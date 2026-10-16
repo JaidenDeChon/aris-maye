@@ -8,6 +8,7 @@ import logUpdate from 'log-update';
 import { OsrsboxItemModel } from '../src/lib/models/mongo-schemas/osrsbox-db-item-schema';
 import type { IOsrsboxItem } from '../src/lib/models/osrsbox-db-item';
 import { deriveWikiPageIdentity } from '../src/lib/helpers/wiki-page-title';
+import { applyItemRename } from '../src/lib/helpers/item-renames';
 
 /**
  * ====================================================================================================================
@@ -146,7 +147,11 @@ async function upsertGameItems(
 
     const upsertLog = scopedLogger('upsert', context.sourceName);
 
-    const ops = items.map((item) => {
+    const ops = items.map((sourceItem) => {
+        // The snapshot predates some in-game renames; without this a re-import would put
+        // the old name (and the old wiki page, which has no recipe) back.
+        const item = applyItemRename(sourceItem);
+
         // Preserve any existing creationSpecs by never updating them from this source.
         const { creationSpecs, ...itemWithoutCreationSpecs } = item;
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+    import SeoHead from '$lib/components/global/seo-head.svelte';
+    import { favoritesSeo } from '$lib/seo/static-page-seo';
     import { onMount } from 'svelte';
     import { favoritesStore } from '$lib/stores/favorites-store';
     import ItemCard from '$lib/components/global/item-card.svelte';
@@ -24,6 +26,8 @@
         loading = false;
     });
 </script>
+
+<SeoHead seo={favoritesSeo} />
 
 <div class="px-4 sm:px-6 lg:px-8">
     <div class="max-w-5xl mx-auto w-full">

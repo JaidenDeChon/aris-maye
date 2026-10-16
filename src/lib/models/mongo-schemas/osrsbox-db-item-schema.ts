@@ -156,6 +156,9 @@ osrsboxItemSchema.index({ tradeable_on_ge: 1, placeholder: 1, noted: 1, stacked:
 osrsboxItemSchema.index({ name: 1 });
 // Serves the homepage's "most traded" list.
 osrsboxItemSchema.index({ tradeable_on_ge: 1, volume1h: -1 });
+// Serves the item page's "Used in" lookup and the sitemap's ingredient list, which would
+// otherwise scan every item's recipes.
+osrsboxItemSchema.index({ 'creationSpecs.ingredients.item': 1 });
 
 export const OsrsboxItemModel: Model<OsrsboxItemDocument> =
     mongoose.models.OsrsboxItem || mongoose.model<OsrsboxItemDocument>('OsrsboxItem', osrsboxItemSchema);

@@ -39,6 +39,9 @@
     import { activeCanUseGrandExchange, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { NATURE_RUNE_FALLBACK_PRICE, alchemyValueAfterRune } from '$lib/constants/alchemy';
     import { toast } from 'svelte-sonner';
+    import SeoHead from '$lib/components/global/seo-head.svelte';
+    import ItemUsedIn from '$lib/components/items/item-used-in.svelte';
+    import { itemPageSeo } from '$lib/seo/item-seo';
 
     const {
         data,
@@ -63,6 +66,9 @@
     let loadProblem = $state<'missing' | 'failed' | null>(
         initialResult && initialResult.status !== 'found' ? initialResult.status : null,
     );
+    // Rebuilt as the item lands. During the server render it's already the real item, which is
+    // what crawlers read; on a client-side click it reads "Loading" until the new item arrives.
+    const seo = $derived(itemPageSeo({ itemId: data.itemId, gameItem, loadProblem }));
     let treeItem = $state<IOsrsboxItemWithMeta | null>(null);
     // `treeLoading` is the cold start, where there is nothing on screen yet and the card
     // shows skeletons. `treeRefreshing` is the warm case: the reader moved to another item
@@ -220,7 +226,9 @@
                 throw new Error(message || 'Failed to refresh item.');
             }
             const updated = (await resp.json()) as IOsrsboxItemWithMeta;
-            gameItem = updated;
+            // The edit endpoint doesn't carry "Used in" or the namesake check, so keep what the page
+            // already has.
+            gameItem = { ...updated, usedIn: gameItem?.usedIn, sameNamePrimaryId: gameItem?.sameNamePrimaryId };
             if (updated?.id !== null && updated?.id !== undefined) {
                 // The item was just re-read from the source of truth, so the cached tree for it
                 // is stale by definition.
@@ -439,6 +447,8 @@
         bankDialogOpen = false;
     }
 </script>
+
+<SeoHead {seo} />
 
 <div class="content-sizing pt-6 pb-10">
     <Dialog.Root bind:open={bankDialogOpen}>
@@ -774,6 +784,10 @@
                 </section>
             {/if}
         </div>
+
+        {#if gameItem?.usedIn?.total}
+            <ItemUsedIn usedIn={gameItem.usedIn} />
+        {/if}
     {/if}
 </div>
 

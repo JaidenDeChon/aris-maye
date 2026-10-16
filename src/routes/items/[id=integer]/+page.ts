@@ -23,7 +23,7 @@ async function loadNatureRunePrice(fetch: LoadFetch): Promise<number | null> {
     // A failed nature rune lookup is not worth failing the page over; the alchemy helper falls back
     // to a documented default so the number is slightly stale rather than absent.
     try {
-        const response = await fetch(`/api/game-item?id=${NATURE_RUNE_ITEM_ID}`);
+        const response = await fetch(`/api/game-item?id=${NATURE_RUNE_ITEM_ID}&fields=price`);
         if (!response.ok) return null;
         return ((await response.json())?.highPrice ?? null) as number | null;
     } catch {
