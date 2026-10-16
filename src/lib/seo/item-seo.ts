@@ -1,19 +1,18 @@
-import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
-import { skillLabel } from '$lib/helpers/homepage';
 import { EMPTY_USED_IN, type ItemUsedIn } from '$lib/models/item-used-in';
 import type { IOsrsboxItemWithMeta } from '$lib/models/osrsbox-db-item';
 import { DESCRIPTION_MAX, TITLE_MAX, firstThatFits } from './fit-text';
+import { hasRecipe, recipeFacts } from './item-facts';
 import type { PageSeo } from './page-seo';
+import { buildItemShareCard } from './share-card';
+import { itemShareImagePath } from './share-image';
+
+export { hasRecipe };
 
 type ItemPageState = {
     itemId: string;
     gameItem: IOsrsboxItemWithMeta | null;
     loadProblem: 'missing' | 'failed' | null;
 };
-
-export function hasRecipe(item: Pick<IOsrsboxItemWithMeta, 'creationSpecs'>): boolean {
-    return (item.creationSpecs?.length ?? 0) > 0;
-}
 
 type IndexableFields = Pick<
     IOsrsboxItemWithMeta,
@@ -40,25 +39,6 @@ export function isItemCopy(item: Pick<IOsrsboxItemWithMeta, 'noted' | 'placehold
 export function isIndexableItem(item: IndexableFields, usedInTotal: number): boolean {
     if (isItemCopy(item) || isSecondaryForName(item)) return false;
     return hasRecipe(item) || usedInTotal > 0;
-}
-
-function formatXp(amount: number): string {
-    return amount.toLocaleString('en-US', { maximumFractionDigits: 1 });
-}
-
-function recipeFacts(item: IOsrsboxItemWithMeta) {
-    const spec = getPrimaryCreationSpec(item);
-    const requirement = spec?.requiredSkills?.find(
-        (req) => req.skillName && typeof req.skillLevel === 'number' && Number.isFinite(req.skillLevel),
-    );
-    const xp = spec?.experienceGranted?.find(
-        (grant) => grant.skillName && typeof grant.experienceAmount === 'number' && grant.experienceAmount > 0,
-    );
-    return {
-        skill: requirement ? skillLabel(requirement.skillName) : null,
-        level: requirement?.skillLevel ?? null,
-        xp: xp ? `${formatXp(xp.experienceAmount)} ${skillLabel(xp.skillName)} XP` : null,
-    };
 }
 
 function recipeSeo(item: IOsrsboxItemWithMeta, path: string): PageSeo {
@@ -126,12 +106,20 @@ function priceOnlySeo(item: IOsrsboxItemWithMeta, path: string): PageSeo {
     };
 }
 
-export function buildItemSeo(item: IOsrsboxItemWithMeta, usedIn: ItemUsedIn): PageSeo {
+function itemTextSeo(item: IOsrsboxItemWithMeta, usedIn: ItemUsedIn): PageSeo {
     const path = `/items/${item.id}`;
     if (isItemCopy(item) || isSecondaryForName(item)) return priceOnlySeo(item, path);
     if (hasRecipe(item)) return recipeSeo(item, path);
     if (usedIn.total > 0) return ingredientSeo(item, usedIn, path);
     return priceOnlySeo(item, path);
+}
+
+export function buildItemSeo(item: IOsrsboxItemWithMeta, usedIn: ItemUsedIn): PageSeo {
+    return {
+        ...itemTextSeo(item, usedIn),
+        image: itemShareImagePath(item.id),
+        imageAlt: buildItemShareCard(item, usedIn).alt,
+    };
 }
 
 export function buildItemNotFoundSeo(path: string): PageSeo {
