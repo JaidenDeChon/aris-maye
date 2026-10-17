@@ -5,7 +5,7 @@
     import { Label } from '$lib/components/ui/label';
     import { Switch } from '$lib/components/ui/switch';
     import { onDestroy, untrack } from 'svelte';
-    import { pushState } from '$app/navigation';
+    import { afterNavigate, pushState, replaceState } from '$app/navigation';
     import { page } from '$app/state';
     import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
     import type { SkillTreePage } from '$lib/constants/skill-tree-pages';
@@ -18,9 +18,14 @@
         FILTER_OPTIONS as filterOptions,
         PROFIT_SORT_VALUES as profitSortValues,
         SORT_OPTIONS as sortOptions,
+        itemsViewPath,
         normalizeSort,
         parseItemsView,
+        type ItemsView,
     } from '$lib/helpers/items-view-url';
+    import { Button } from '$lib/components/ui/button';
+    import Link2 from '@lucide/svelte/icons/link-2';
+    import { toast } from 'svelte-sonner';
     import type { IGameItem } from '$lib/models/game-item';
     import type { CharacterProfile } from '$lib/models/player-stats';
 
@@ -187,6 +192,43 @@
             profitModeChecked = $itemsPagePreferences.profitMode ?? false;
         }
     });
+
+    const currentView: ItemsView = $derived({
+        filter: filterSelected,
+        sort: sortOrderSelected,
+        profit: profitModeChecked,
+    });
+
+    // Mirror the view into the address bar, including saved settings on a bare URL, so what's on screen
+    // is always what the address bar shares. replaceState adds nothing to the back button, and passing
+    // page.state keeps the pagination entries. SvelteKit refuses replaceState until the router has
+    // started, which is only after the first load's afterNavigate callbacks, hence the timeout.
+    let addressBarReady = $state(false);
+    afterNavigate(() => {
+        setTimeout(() => (addressBarReady = true));
+    });
+    $effect(() => {
+        const view = currentView;
+        if (!addressBarReady) return;
+        untrack(() => {
+            const next = itemsViewPath(page.url.pathname, page.url.searchParams, view);
+            if (next === page.url.pathname + page.url.search) return;
+            // The path is page.url's own, so it's already resolved.
+            // eslint-disable-next-line svelte/no-navigation-without-resolve
+            replaceState(next, { ...page.state });
+        });
+    });
+
+    async function copyViewLink() {
+        const link = location.origin + itemsViewPath(location.pathname, new URLSearchParams(), currentView);
+        try {
+            if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+            await navigator.clipboard.writeText(link);
+            toast.success('Link copied');
+        } catch {
+            toast.error("Couldn't copy. Copy the address bar instead.");
+        }
+    }
 
     // Reset pagination whenever a skill-specific route is entered.
     $effect(() => {
@@ -564,6 +606,10 @@
                             </Select.Content>
                         </Select.Root>
                     </div>
+                    <Button variant="outline" onclick={copyViewLink}>
+                        <Link2 class="h-4 w-4" />
+                        Copy link
+                    </Button>
                 </div>
             </div>
         </div>
