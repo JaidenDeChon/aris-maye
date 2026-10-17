@@ -25,15 +25,19 @@
 
 ## Decision made while planning (record in the spec in Task 5)
 
-SvelteKit 2.49's `replaceState` throws `Cannot call replaceState(...) before router is initialized` when called during hydration (`node_modules/@sveltejs/kit/src/runtime/client/client.js:2317`). So the address-bar effect **skips its first run**: it starts updating the URL with the first change after load. Consequences, both acceptable: a bare `/items` with saved `f2p` stays bare until the visitor changes something (Copy link still copies the full view), and an invalid link such as `?filter=bogus` is not rewritten until a change.
+**The address bar always matches the screen, including on load.** A visitor with saved settings who opens bare `/items` sees `/items?filter=f2p` (for example) as soon as the page is ready. An invalid or legacy link such as `?filter=bogus` or `?sort=profit-desc` is rewritten to what it actually shows. The rewrite uses `replaceState`, so it adds no history entry.
+
+The timing matters. In dev, SvelteKit 2.49's `replaceState` throws `Cannot call replaceState(...) before router is initialized` (`node_modules/@sveltejs/kit/src/runtime/client/client.js:2317`). The router only counts as started after the `afterNavigate` callbacks for the first load have run (`client.js:615-618`). So the component waits for `afterNavigate`, then a `setTimeout`, before it first writes the URL. `afterNavigate` also fires when the skill route remounts the component, so the same path covers client-side navigation.
+
+Side effect, accepted: once the URL carries the saved view, a reload or Back opens it as a link. The screen is identical, but those controls stop following saved-settings changes made in another tab until the visitor touches them. Search engines are unaffected: a crawler has no saved settings, so it never sees a rewritten URL, and the canonical stays `/items`.
 
 ## Review Focus
 
-1. **Mixed link and saved state.** The link turns profit on, saved settings have it off, and the visitor picks "Sort by ROI (value)". The sort must stay on ROI (value). The sync effect must not normalise it against the _saved_ profit setting and flip it back to `desc`. Covered by browser check 3b and the `effectiveProfit` code in Task 3.
+1. **Mixed link and saved state.** The link turns profit on, saved settings have it off, and the visitor picks "Sort by ROI (value)". The sort must stay on ROI (value). The sync effect must not normalise it against the _saved_ profit setting and flip it back to `desc`. Covered by browser check 3b and the `profitEnabled` line of Task 3's sync effect.
 2. **Profit toggled while sort came from the link and doesn't change.** The link is `?filter=members&profit=1` (sort `desc`) and the visitor turns profit off. Only `profitMode` saves; the saved sort is left alone. Covered by browser check 3c and Task 3's `handleProfitModeToggle`.
-3. **Unrelated parameters such as `utm_source`.** They survive the address-bar rewrite. Covered by a unit test and browser check 1b.
+3. **Unrelated parameters such as `utm_source`.** They survive the address-bar rewrite. Covered by a unit test and browser check 3.
 4. **Duplicate or empty keys** such as `?filter=members&filter=f2p` or `?sort=`. The first value wins, an empty value means the default, and the output never repeats a key. Covered by unit tests.
-5. **Hydration.** A link URL loaded directly must not throw on mount, and the server-rendered controls must match the client. Covered by browser check 1, which fails on any `pageerror` or console error mentioning `replaceState`.
+5. **Hydration.** A link URL loaded directly, or a bare URL rewritten on load, must not throw `replaceState` errors, and the server-rendered controls must match the client. Covered by browser checks 1 and 5, which fail on any `pageerror` or console error mentioning `replaceState`. Both must also run against `vite dev`, where SvelteKit enforces the router-started rule (Task 4 Step 5).
 
 ---
 
@@ -486,27 +490,48 @@ check(
 );
 check(await page.getByText('Link copied').isVisible(), '7. "Link copied" toast appears');
 
-// 5. Bare URL uses saved settings (saved filter is still f2p, sort desc)
-await page.goto(`${baseUrl}/items`);
+// 5. Bare URL uses saved settings and writes them into the address bar (saved: f2p, sort desc)
+const beforeBare = await page.evaluate(() => history.length);
+const savedBeforeBare = await saved(page);
+errors.length = 0;
+await page.goto(`${baseUrl}/items?utm_source=check`);
 await settle(page);
 check((await triggerText(page, 0)) === 'Free to play', '5. bare URL shows saved filter');
 check((await triggerText(page, 1)) === 'Sort by value', '5. bare URL shows saved sort');
 check(lastApi()?.get('filter') === 'f2p', '5. bare URL request carries filter=f2p');
+check(
+    pathAndQuery(page) === '/items?utm_source=check&filter=f2p',
+    `5. address bar shows the saved view (${pathAndQuery(page)})`,
+);
+check((await page.evaluate(() => history.length)) === beforeBare + 1, '5. the rewrite adds no history entry');
+check((await saved(page)) === savedBeforeBare, '5. the rewrite saves nothing');
+check(!errors.some((e) => /replaceState|hydrat/i.test(e)), `5. no replaceState errors (${errors.join(' | ')})`);
 
-// 6. Invalid parameters
+// 6. Invalid parameters show defaults and are cleaned out of the address bar
 await page.goto(`${baseUrl}/items?filter=bogus&sort=roi-desc`);
 await settle(page);
 check((await triggerText(page, 0)) === 'All items', '6. invalid filter shows All items');
 check((await triggerText(page, 1)) === 'Sort by value', '6. ROI sort without profit shows sort by value');
+check(pathAndQuery(page) === '/items', `6. address bar drops the invalid view (${pathAndQuery(page)})`);
+await page.goto(`${baseUrl}/items?sort=profit-desc&profit=1`);
+await settle(page);
+check(
+    pathAndQuery(page) === '/items?sort=roi-value-desc&profit=1',
+    `6. legacy sort is rewritten (${pathAndQuery(page)})`,
+);
 
 // 8. Skill pages
 await page.goto(`${baseUrl}/items/smithing?filter=members`);
 await settle(page);
 check((await triggerText(page, 0)) === 'Members only', '8. skill page link shows Members only');
 await page.locator('a[href="/items/mining"]').first().click();
-await page.waitForURL('**/items/mining');
+await page.waitForURL((url) => url.pathname === '/items/mining');
 await settle(page);
 check((await triggerText(page, 0)) === 'Free to play', '8. sidebar skill shows saved f2p');
+check(
+    pathAndQuery(page) === '/items/mining?filter=f2p',
+    `8. skill page address bar shows saved view (${pathAndQuery(page)})`,
+);
 
 // 9. SEO unchanged
 await page.goto(`${baseUrl}/items?filter=members&profit=1`);
@@ -732,7 +757,7 @@ git commit -m "Let a shared link set the items view without touching saved setti
 
 - [ ] **Step 1: Imports**
 
-Change `import { pushState } from '$app/navigation';` to `import { pushState, replaceState } from '$app/navigation';`. Then add `itemsViewPath` and `type ItemsView` to the `items-view-url` import, and add:
+Change `import { pushState } from '$app/navigation';` to `import { afterNavigate, pushState, replaceState } from '$app/navigation';`. Then add `itemsViewPath` and `type ItemsView` to the `items-view-url` import, and add:
 
 ```ts
 import { Button } from '$lib/components/ui/button';
@@ -751,16 +776,17 @@ const currentView: ItemsView = $derived({
     profit: profitModeChecked,
 });
 
-// Mirror the view into the address bar so it can be copied from there. replaceState adds nothing to
-// the back button, and passing page.state keeps the pagination entries. The first run is skipped:
-// SvelteKit refuses replaceState during hydration, and the URL already describes the opening view.
-let addressBarReady = false;
+// Mirror the view into the address bar, including saved settings on a bare URL, so what's on screen
+// is always what the address bar shares. replaceState adds nothing to the back button, and passing
+// page.state keeps the pagination entries. SvelteKit refuses replaceState until the router has
+// started, which is only after the first load's afterNavigate callbacks, hence the timeout.
+let addressBarReady = $state(false);
+afterNavigate(() => {
+    setTimeout(() => (addressBarReady = true));
+});
 $effect(() => {
     const view = currentView;
-    if (!addressBarReady) {
-        addressBarReady = true;
-        return;
-    }
+    if (!addressBarReady) return;
     untrack(() => {
         const next = itemsViewPath(page.url.pathname, page.url.searchParams, view);
         if (next !== page.url.pathname + page.url.search) replaceState(next, { ...page.state });
@@ -811,7 +837,14 @@ NODE_OPTIONS=--no-experimental-webstorage bun run build   # restart the preview 
 bun run verify-share-links "http://localhost:4173"
 ```
 
-Expected: every check passes and the script exits 0. Open `$TMPDIR/verify-share-links/toolbar-390.png` and `toolbar-1280.png` and check the button looks right, then show them to the user.
+Then run it against the dev server too, because only dev enforces SvelteKit's "router is initialized" rule for `replaceState`:
+
+```bash
+NODE_OPTIONS=--no-experimental-webstorage bunx vite dev --port 5173   # run in the background
+bun run verify-share-links "http://localhost:5173"
+```
+
+Expected: every check passes and the script exits 0 on both servers. Open `$TMPDIR/verify-share-links/toolbar-390.png` and `toolbar-1280.png` and check the button looks right, then show them to the user.
 
 - [ ] **Step 6: Commit**
 
@@ -858,10 +891,13 @@ Append to the spec:
 ```markdown
 ## Decisions made during implementation
 
-- **The address bar starts updating with the first change, not on load.** SvelteKit refuses
-  `replaceState` during hydration, and on load the URL already describes the view. So a bare
-  `/items` stays bare until the visitor changes something (Copy link still copies the full view),
-  and an invalid link such as `?filter=bogus` is cleaned up on the first change.
+- **The address bar matches the screen from the moment the page is ready.** A bare `/items`
+  with saved settings becomes, for example, `/items?filter=f2p`, and invalid or legacy values are
+  rewritten to what is shown. This uses `replaceState`, so there's no extra history entry and
+  nothing is saved. SvelteKit refuses `replaceState` until the router has started, so the first
+  write waits for `afterNavigate` and a timeout. A reload of such a URL opens it as a link: the
+  screen is the same, but those controls stop following saved-settings changes from another tab
+  until the visitor touches them.
 - **Sort is judged against the profit mode on screen.** While profit mode comes from the link, an
   ROI sort the visitor picks is kept, and the saved-settings rewrite of a "stale" ROI sort is
   skipped. Otherwise it would be checked against the saved profit setting and flipped back to
