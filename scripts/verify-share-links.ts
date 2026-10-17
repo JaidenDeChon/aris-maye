@@ -186,6 +186,9 @@ check(
 check(await page.getByText('Link copied').isVisible(), '7. "Link copied" toast appears');
 
 // 5. Bare URL uses saved settings and writes them into the address bar (saved: f2p, sort desc)
+// Back to the known saved setup: check 3b left an ROI sort saved with profit off, which the page
+// rightly cleans up on a bare load, and that cleanup isn't what this check is about.
+await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: PREFS_KEY, value: SAVED });
 const savedBeforeBare = await saved(page);
 errors.length = 0;
 // Count history at commit, before any page script runs: a fresh navigation after Back drops the

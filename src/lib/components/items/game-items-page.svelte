@@ -14,31 +14,17 @@
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { filterItemsStore } from '$lib/stores/filter-items-by-player-levels';
     import { itemsPagePreferences } from '$lib/stores/items-page-preferences';
+    import {
+        FILTER_OPTIONS as filterOptions,
+        PROFIT_SORT_VALUES as profitSortValues,
+        SORT_OPTIONS as sortOptions,
+        normalizeSort,
+        parseItemsView,
+    } from '$lib/helpers/items-view-url';
     import type { IGameItem } from '$lib/models/game-item';
     import type { CharacterProfile } from '$lib/models/player-stats';
 
     const perPageOptions = [12, 24, 48, 96, 192];
-    const filterOptions = [
-        { value: 'all', label: 'All items' },
-        { value: 'members', label: 'Members only' },
-        { value: 'f2p', label: 'Free to play' },
-        { value: 'equipable', label: 'Equipable' },
-        { value: 'stackable', label: 'Stackable' },
-        { value: 'quest', label: 'Quest items' },
-        { value: 'nonquest', label: 'Non-quest items' },
-    ];
-    const sortOptions = [
-        { value: 'roi-desc', label: 'Sort by ROI (percentage)' },
-        { value: 'roi-value-desc', label: 'Sort by ROI (value)' },
-        { value: 'desc', label: 'Sort by value' },
-    ];
-    // Sort orders that are computed from creation cost, so they need profit mode turned on.
-    const profitSortValues = ['roi-desc', 'roi-value-desc'];
-    // Retired sort orders still sitting in persisted preferences or bookmarked URLs.
-    const legacySortValues: Record<string, string> = {
-        'profit-asc': 'roi-value-desc',
-        'profit-desc': 'roi-value-desc',
-    };
 
     function normalizeSkillLevels(skillLevels?: CharacterProfile['skillLevels'], hasCharacter = true) {
         if (!hasCharacter) return undefined;
@@ -96,12 +82,21 @@
     // view opens on. Skill routes always open on page 1 (see the reset effect below).
     const historyBasePage = untrack(() => (skillSlug ? 1 : Number($itemsPagePreferences.page) || 1));
     let perPageSelected = $state($itemsPagePreferences.perPage || '12');
-    let filterSelected = $state($itemsPagePreferences.filter || 'all');
+    // A shared link's filter, sort and profit mode win over saved settings for this page. Each flag
+    // stays set until the visitor changes that control, and while it is set the control is never
+    // written to, or overwritten from, saved settings. The skill route remounts this component per
+    // skill, so reading the URL once here is enough.
+    const linkView = untrack(() => parseItemsView(page.url.searchParams));
+    let filterFromLink = linkView !== null;
+    let sortFromLink = linkView !== null;
+    let profitFromLink = linkView !== null;
+    let filterSelected = $state(linkView?.filter ?? ($itemsPagePreferences.filter || 'all'));
     let sortOrderSelected = $state(
-        normalizeSortSelection($itemsPagePreferences.sortOrder, $itemsPagePreferences.profitMode ?? false),
+        linkView?.sort ??
+            normalizeSortSelection($itemsPagePreferences.sortOrder, $itemsPagePreferences.profitMode ?? false),
     );
     let useSuppliesChecked = $state($itemsPagePreferences.useSupplies ?? false);
-    let profitModeChecked = $state($itemsPagePreferences.profitMode ?? false);
+    let profitModeChecked = $state(linkView?.profit ?? $itemsPagePreferences.profitMode ?? false);
     const perPageValue = $derived(Number(perPageSelected) || 12);
     const perPageLabel = $derived(`${perPageValue}`);
     const filterLabel = $derived(
@@ -164,18 +159,23 @@
     });
 
     // Keep local selection state in sync with persisted preferences (e.g., when storage events fire).
+    // Controls that came from a shared link are left alone (see linkView).
     $effect(() => {
-        if ($itemsPagePreferences.filter !== filterSelected) {
+        if (!filterFromLink && $itemsPagePreferences.filter !== filterSelected) {
             filterSelected = $itemsPagePreferences.filter || 'all';
         }
-        const prefOrder = $itemsPagePreferences.sortOrder || 'desc';
-        const profitPrefEnabled = $itemsPagePreferences.profitMode ?? false;
-        const normalizedOrder = normalizeSortSelection(prefOrder, profitPrefEnabled);
-        if (normalizedOrder !== sortOrderSelected) {
-            sortOrderSelected = normalizedOrder;
-        }
-        if (normalizedOrder !== prefOrder) {
-            itemsPagePreferences.set({ ...$itemsPagePreferences, sortOrder: normalizedOrder });
+        if (!sortFromLink) {
+            const prefOrder = $itemsPagePreferences.sortOrder || 'desc';
+            // While profit mode comes from the link, judge the sort against what is on screen, not
+            // the saved setting, or an ROI sort picked under the link's profit mode would flip back.
+            const profitEnabled = profitFromLink ? profitModeChecked : ($itemsPagePreferences.profitMode ?? false);
+            const normalizedOrder = normalizeSortSelection(prefOrder, profitEnabled);
+            if (normalizedOrder !== sortOrderSelected) {
+                sortOrderSelected = normalizedOrder;
+            }
+            if (!profitFromLink && normalizedOrder !== prefOrder) {
+                itemsPagePreferences.set({ ...$itemsPagePreferences, sortOrder: normalizedOrder });
+            }
         }
         if ($itemsPagePreferences.perPage !== perPageSelected) {
             perPageSelected = $itemsPagePreferences.perPage || '12';
@@ -183,7 +183,7 @@
         if ($itemsPagePreferences.useSupplies !== useSuppliesChecked) {
             useSuppliesChecked = $itemsPagePreferences.useSupplies ?? false;
         }
-        if ($itemsPagePreferences.profitMode !== profitModeChecked) {
+        if (!profitFromLink && $itemsPagePreferences.profitMode !== profitModeChecked) {
             profitModeChecked = $itemsPagePreferences.profitMode ?? false;
         }
     });
@@ -356,6 +356,7 @@
     }
 
     function handleFilterChange(value: string) {
+        filterFromLink = false;
         filterSelected = value || 'all';
         itemsPagePreferences.set({ ...$itemsPagePreferences, filter: filterSelected });
         currentPage = 1;
@@ -363,15 +364,11 @@
     }
 
     function normalizeSortSelection(value?: string | null, profitEnabled = profitModeChecked) {
-        if (!value) return 'desc';
-        const resolved = legacySortValues[value] ?? value;
-        if (profitSortValues.includes(resolved)) {
-            return profitEnabled ? resolved : 'desc';
-        }
-        return 'desc';
+        return normalizeSort(value, profitEnabled);
     }
 
     function handleSortChange(value: string) {
+        sortFromLink = false;
         const normalized = normalizeSortSelection(value, profitModeEnabled);
         sortOrderSelected = normalized;
         itemsPagePreferences.update((prefs) => ({ ...prefs, sortOrder: normalized }));
@@ -404,12 +401,15 @@
         const nextSortOrder = normalizeSortSelection(sortOrderSelected, value);
         if (nextSortOrder !== sortOrderSelected) {
             sortOrderSelected = nextSortOrder;
+            // Losing an ROI sort is a consequence of the visitor's own toggle, so it saves too.
+            sortFromLink = false;
         }
         profitModeChecked = value;
+        profitFromLink = false;
         itemsPagePreferences.update((prefs) => ({
             ...prefs,
             profitMode: value,
-            sortOrder: nextSortOrder,
+            ...(sortFromLink ? {} : { sortOrder: nextSortOrder }),
         }));
         skipCacheOnce = true;
         forceLoading = true;
