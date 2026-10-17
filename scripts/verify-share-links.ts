@@ -234,6 +234,101 @@ check(
     `8. skill page address bar shows saved view (${pathAndQuery(page)})`,
 );
 
+// Each check below starts from the known saved setup, so their order doesn't matter.
+async function resetSaved(p: Page, overrides: Record<string, unknown> = {}) {
+    const value = JSON.stringify({ ...JSON.parse(SAVED), ...overrides });
+    await p.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: PREFS_KEY, value });
+}
+// 'none' when no page is selected, e.g. a saved page number beyond the last page.
+async function selectedPage(p: Page) {
+    const selected = p.locator('[data-pagination-page][data-selected]');
+    return (await selected.count()) ? (await selected.first().innerText()).trim() : 'none';
+}
+const filterValue: Record<string, string> = {
+    'All items': 'all',
+    'Members only': 'members',
+    'Free to play': 'f2p',
+    Equipable: 'equipable',
+};
+// The address bar's filter, read the way the page reads it (absent means all).
+const urlFilter = (p: Page) => new URL(p.url()).searchParams.get('filter') ?? 'all';
+
+// 11. Returning to the view the page was loaded with updates the address bar again
+await resetSaved(page);
+await page.goto(`${baseUrl}/items`);
+await settle(page);
+await choose(page, 0, 'All items');
+check(pathAndQuery(page) === '/items', `11. back to All items clears the filter (${pathAndQuery(page)})`);
+await choose(page, 0, 'Free to play');
+check(pathAndQuery(page) === '/items?filter=f2p', `11. back to the loaded view restores it (${pathAndQuery(page)})`);
+await page.goto(`${baseUrl}/items?filter=members`);
+await settle(page);
+await choose(page, 0, 'Free to play');
+await choose(page, 0, 'Members only');
+check(
+    pathAndQuery(page) === '/items?filter=members',
+    `11. link view chosen again shows in the URL (${pathAndQuery(page)})`,
+);
+
+// 12. A view change on a later page goes back to page 1
+await page.goto(`${baseUrl}/items?filter=members`);
+await settle(page);
+await page.locator('[data-pagination-page]', { hasText: /^2$/ }).first().click();
+await settle(page);
+await choose(page, 0, 'Free to play');
+check((await selectedPage(page)) === '1', '12. filter change on page 2 shows page 1');
+check(lastApi()?.get('page') === '1', `12. and requests page 1 (${lastApi()?.get('page')})`);
+
+// 13. Back from an item page shows the view the visitor left, matching the address bar
+await resetSaved(page);
+await page.goto(`${baseUrl}/items?filter=members&profit=1`);
+await settle(page);
+await choose(page, 0, 'Equipable');
+await page.evaluate(() => {
+    const link = [...document.querySelectorAll('a')].find((a) => /\/items\/\d+$/.test(a.href));
+    link?.click();
+});
+await page.waitForURL((url) => /\/items\/\d+$/.test(url.pathname));
+await settle(page);
+await page.goBack();
+await settle(page);
+check((await triggerText(page, 0)) === 'Equipable', `13. Back shows Equipable (${await triggerText(page, 0)})`);
+check(urlFilter(page) === 'equipable', `13. address bar matches (${pathAndQuery(page)})`);
+check(lastApi()?.get('filter') === 'equipable', `13. request matches (${lastApi()?.get('filter')})`);
+
+// 14. The sidebar's Browse items, from a link view, opens saved settings
+await resetSaved(page);
+await page.goto(`${baseUrl}/items?filter=members&profit=1`);
+await settle(page);
+await page.locator('a[href$="/items"]', { hasText: 'Browse items' }).first().click();
+await page.waitForURL((url) => url.pathname === '/items' && url.searchParams.get('filter') !== 'members');
+await settle(page);
+check(
+    (await triggerText(page, 0)) === 'Free to play',
+    `14. Browse items shows saved f2p (${await triggerText(page, 0)})`,
+);
+check(!(await profitOn(page)), '14. and saved profit mode (off)');
+check(pathAndQuery(page) === '/items?filter=f2p', `14. address bar shows saved view (${pathAndQuery(page)})`);
+
+// 15. A link opens on page 1, whatever page the visitor last saved
+await resetSaved(page, { page: 7 });
+await page.goto(`${baseUrl}/items?filter=quest`);
+await settle(page);
+check(lastApi()?.get('page') === '1', `15. link requests page 1 (${lastApi()?.get('page')})`);
+check((await selectedPage(page)) === '1', '15. link shows page 1');
+
+// 16. Back across pagination after a view change: the address bar matches the screen
+await resetSaved(page);
+await page.goto(`${baseUrl}/items?filter=members`);
+await settle(page);
+await page.locator('[data-pagination-page]', { hasText: /^2$/ }).first().click();
+await settle(page);
+await choose(page, 0, 'Free to play');
+await page.goBack();
+await settle(page);
+const shown = filterValue[await triggerText(page, 0)];
+check(urlFilter(page) === shown, `16. address bar (${urlFilter(page)}) matches the screen (${shown})`);
+
 // 9. SEO unchanged
 await page.goto(`${baseUrl}/items?filter=members&profit=1`);
 await settle(page);

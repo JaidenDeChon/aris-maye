@@ -179,3 +179,14 @@ or check 1 must fail, then pass again once the guard is restored.
 - **The browser check opens a fresh 390px page for the mobile check.** The pagination picks its
   mobile layout when the page loads, so resizing a desktop page reports 27px of overflow that a
   real phone never sees.
+- **The view is read from the address bar, not `page.url`.** SvelteKit's `replaceState` leaves
+  `page.url` on the URL the page loaded with, and stores that old URL in the history entry, so
+  Back from an item page would otherwise bring back the original link's view while the address bar
+  showed the visitor's later choice. The server render still uses `page.url`.
+- **Both routes remount the page on every real navigation** (`{#key page.url.href}`), so following
+  the sidebar's Browse items or the same skill from a shared view opens saved settings. Pagination
+  and view changes are shallow and don't remount it.
+- **A shared link opens on page 1,** not the visitor's saved page number, so they see the list from
+  the top.
+- **The address bar also re-syncs after Back/Forward between pagination entries** and after any
+  navigation, since a view change replaces only the current entry.

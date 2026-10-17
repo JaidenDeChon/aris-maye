@@ -7,6 +7,7 @@
     import { onDestroy, untrack } from 'svelte';
     import { afterNavigate, pushState, replaceState } from '$app/navigation';
     import { page } from '$app/state';
+    import { browser } from '$app/environment';
     import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
     import type { SkillTreePage } from '$lib/constants/skill-tree-pages';
     import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
@@ -82,16 +83,22 @@
 
     const bankItems = $derived(getSuppliesForCharacter($bankItemsStore, activeCharacter?.id ?? null));
     let totalItems = $state(0);
-    let currentPage = $state(Number($itemsPagePreferences.page) || 1);
-    // The page a history entry represents when it has no page recorded on it — i.e. the one this
-    // view opens on. Skill routes always open on page 1 (see the reset effect below).
-    const historyBasePage = untrack(() => (skillSlug ? 1 : Number($itemsPagePreferences.page) || 1));
-    let perPageSelected = $state($itemsPagePreferences.perPage || '12');
+    // The address bar, not page.url: replaceState (below) leaves page.url on the URL the page was
+    // loaded with, and Back to a replaced entry navigates to that old URL while the address bar
+    // shows the replaced one. On the server there is only page.url.
+    const addressBarUrl = () => (browser ? new URL(location.href) : page.url);
     // A shared link's filter, sort and profit mode win over saved settings for this page. Each flag
     // stays set until the visitor changes that control, and while it is set the control is never
-    // written to, or overwritten from, saved settings. The skill route remounts this component per
-    // skill, so reading the URL once here is enough.
-    const linkView = untrack(() => parseItemsView(page.url.searchParams));
+    // written to, or overwritten from, saved settings. The routes remount this component on every
+    // real navigation, so reading the URL once here is enough.
+    const linkView = untrack(() => parseItemsView(addressBarUrl().searchParams));
+    // A link shows its list from the top, not from the visitor's own saved page.
+    const opensOnFirstPage = untrack(() => Boolean(skillSlug) || linkView !== null);
+    let currentPage = $state(opensOnFirstPage ? 1 : Number($itemsPagePreferences.page) || 1);
+    // The page a history entry represents when it has no page recorded on it — i.e. the one this
+    // view opens on. Skill routes and links always open on page 1.
+    const historyBasePage = untrack(() => (opensOnFirstPage ? 1 : Number($itemsPagePreferences.page) || 1));
+    let perPageSelected = $state($itemsPagePreferences.perPage || '12');
     let filterFromLink = linkView !== null;
     let sortFromLink = linkView !== null;
     let profitFromLink = linkView !== null;
@@ -203,17 +210,26 @@
     // is always what the address bar shares. replaceState adds nothing to the back button, and passing
     // page.state keeps the pagination entries. SvelteKit refuses replaceState until the router has
     // started, which is only after the first load's afterNavigate callbacks, hence the timeout.
+    // It also re-runs after each navigation and each Back/Forward between pagination entries
+    // (page.state), since those can put a different URL in the address bar than what is shown.
     let addressBarReady = $state(false);
+    let navigations = $state(0);
     afterNavigate(() => {
-        setTimeout(() => (addressBarReady = true));
+        setTimeout(() => {
+            addressBarReady = true;
+            navigations++;
+        });
     });
     $effect(() => {
         const view = currentView;
+        void navigations;
+        void page.state;
         if (!addressBarReady) return;
         untrack(() => {
-            const next = itemsViewPath(page.url.pathname, page.url.searchParams, view);
-            if (next === page.url.pathname + page.url.search) return;
-            // The path is page.url's own, so it's already resolved.
+            const current = addressBarUrl();
+            const next = itemsViewPath(current.pathname, current.searchParams, view);
+            if (next === current.pathname + current.search) return;
+            // The path is the address bar's own, so it's already resolved.
             // eslint-disable-next-line svelte/no-navigation-without-resolve
             replaceState(next, { ...page.state });
         });
@@ -375,10 +391,13 @@
     // (see handlePaginationPageChange), so whichever entry we land on tells us what to show;
     // SvelteKit restores that entry's scroll position itself. Reading currentPage untracked keeps
     // this from re-running — and snapping the page back — when a filter or sort resets it to 1.
+    // A derived, so replaceState handing over a new page.state with the same page number doesn't
+    // re-run this and undo a filter or sort change's reset to page 1.
+    const entryPage = $derived(page.state.itemsPage ?? historyBasePage);
     $effect(() => {
-        const entryPage = page.state.itemsPage ?? historyBasePage;
+        const target = entryPage;
         untrack(() => {
-            if (entryPage !== currentPage) currentPage = entryPage;
+            if (target !== currentPage) currentPage = target;
         });
     });
 
