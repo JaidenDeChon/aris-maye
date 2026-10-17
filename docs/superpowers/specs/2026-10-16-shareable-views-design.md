@@ -159,3 +159,23 @@ or check 1 must fail, then pass again once the guard is restored.
 - `verify-share-links` against the PR's Netlify preview.
 - Manual (owner): share a filtered preview link in Discord and open it in a private window. It
   should open the same view.
+
+## Decisions made during implementation
+
+- **The address bar matches the screen from the moment the page is ready.** A bare `/items`
+  with saved settings becomes, for example, `/items?filter=f2p`, and invalid or legacy values are
+  rewritten to what is shown. This uses `replaceState`, so there's no extra history entry and
+  nothing is saved. SvelteKit refuses `replaceState` until the router has started, so the first
+  write waits for `afterNavigate` and a timeout. A reload of such a URL opens it as a link: the
+  screen is the same, but those controls stop following saved-settings changes from another tab
+  until the visitor touches them.
+- **Sort is judged against the profit mode on screen.** While profit mode comes from the link, an
+  ROI sort the visitor picks is kept, and the saved-settings rewrite of a "stale" ROI sort is
+  skipped. Otherwise it would be checked against the saved profit setting and flipped back to
+  sort by value.
+- **Turning profit off saves the sort only if the sort changed.** A link-derived sort that
+  survives the toggle stays unsaved.
+- Option lists and sort normalisation live in `items-view-url.ts`, and the component imports them.
+- **The browser check opens a fresh 390px page for the mobile check.** The pagination picks its
+  mobile layout when the page loads, so resizing a desktop page reports 27px of overflow that a
+  real phone never sees.
