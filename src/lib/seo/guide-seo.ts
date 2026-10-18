@@ -54,7 +54,7 @@ export function buildCheapestXpSkillSeo(skill: XpGuideSkill): PageSeo {
 export const ironmanSeo: PageSeo = {
     title: 'OSRS Ironman Money Making: Shops, Alching & Crafting',
     description:
-        'Ways to make money on an OSRS Ironman without the Grand Exchange: shops that pay well, shop-bought crafts and alching.',
+        'Ways to make money on an OSRS Ironman without the Grand Exchange: selling to shops that pay well, making things from shop stock and alching.',
     canonicalPath: '/guides/ironman-money-making',
     robots: 'index',
 };

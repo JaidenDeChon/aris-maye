@@ -3,6 +3,10 @@
         "humanized_at": "2026-10-18T03:14:14Z",
         "sha256": "f5d6a79879b7971a0f27b2492c864e465313e35376ed8bea653d4b4fb3e7327c"
     },
+    "src/lib/seo/guide-seo.ts": {
+        "humanized_at": "2026-10-18T03:14:27Z",
+        "sha256": "c59aff782e2dc1a4ae57d08fd2ef705c040a9dc48ba4174fe755b50cd3260b2c"
+    },
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
