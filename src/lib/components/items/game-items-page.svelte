@@ -5,8 +5,9 @@
     import { Label } from '$lib/components/ui/label';
     import { Switch } from '$lib/components/ui/switch';
     import { onDestroy, untrack } from 'svelte';
-    import { pushState } from '$app/navigation';
+    import { afterNavigate, pushState, replaceState } from '$app/navigation';
     import { page } from '$app/state';
+    import { browser } from '$app/environment';
     import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
     import type { SkillTreePage } from '$lib/constants/skill-tree-pages';
     import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
@@ -14,31 +15,22 @@
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
     import { filterItemsStore } from '$lib/stores/filter-items-by-player-levels';
     import { itemsPagePreferences } from '$lib/stores/items-page-preferences';
+    import {
+        FILTER_OPTIONS as filterOptions,
+        PROFIT_SORT_VALUES as profitSortValues,
+        SORT_OPTIONS as sortOptions,
+        itemsViewPath,
+        normalizeSort,
+        parseItemsView,
+        type ItemsView,
+    } from '$lib/helpers/items-view-url';
+    import { Button } from '$lib/components/ui/button';
+    import Link2 from '@lucide/svelte/icons/link-2';
+    import { toast } from 'svelte-sonner';
     import type { IGameItem } from '$lib/models/game-item';
     import type { CharacterProfile } from '$lib/models/player-stats';
 
     const perPageOptions = [12, 24, 48, 96, 192];
-    const filterOptions = [
-        { value: 'all', label: 'All items' },
-        { value: 'members', label: 'Members only' },
-        { value: 'f2p', label: 'Free to play' },
-        { value: 'equipable', label: 'Equipable' },
-        { value: 'stackable', label: 'Stackable' },
-        { value: 'quest', label: 'Quest items' },
-        { value: 'nonquest', label: 'Non-quest items' },
-    ];
-    const sortOptions = [
-        { value: 'roi-desc', label: 'Sort by ROI (percentage)' },
-        { value: 'roi-value-desc', label: 'Sort by ROI (value)' },
-        { value: 'desc', label: 'Sort by value' },
-    ];
-    // Sort orders that are computed from creation cost, so they need profit mode turned on.
-    const profitSortValues = ['roi-desc', 'roi-value-desc'];
-    // Retired sort orders still sitting in persisted preferences or bookmarked URLs.
-    const legacySortValues: Record<string, string> = {
-        'profit-asc': 'roi-value-desc',
-        'profit-desc': 'roi-value-desc',
-    };
 
     function normalizeSkillLevels(skillLevels?: CharacterProfile['skillLevels'], hasCharacter = true) {
         if (!hasCharacter) return undefined;
@@ -91,17 +83,32 @@
 
     const bankItems = $derived(getSuppliesForCharacter($bankItemsStore, activeCharacter?.id ?? null));
     let totalItems = $state(0);
-    let currentPage = $state(Number($itemsPagePreferences.page) || 1);
+    // The address bar, not page.url: replaceState (below) leaves page.url on the URL the page was
+    // loaded with, and Back to a replaced entry navigates to that old URL while the address bar
+    // shows the replaced one. On the server there is only page.url.
+    const addressBarUrl = () => (browser ? new URL(location.href) : page.url);
+    // A shared link's filter, sort and profit mode win over saved settings for this page. Each flag
+    // stays set until the visitor changes that control, and while it is set the control is never
+    // written to, or overwritten from, saved settings. The routes remount this component on every
+    // real navigation, so reading the URL once here is enough.
+    const linkView = untrack(() => parseItemsView(addressBarUrl().searchParams));
+    // A link shows its list from the top, not from the visitor's own saved page.
+    const opensOnFirstPage = untrack(() => Boolean(skillSlug) || linkView !== null);
+    let currentPage = $state(opensOnFirstPage ? 1 : Number($itemsPagePreferences.page) || 1);
     // The page a history entry represents when it has no page recorded on it — i.e. the one this
-    // view opens on. Skill routes always open on page 1 (see the reset effect below).
-    const historyBasePage = untrack(() => (skillSlug ? 1 : Number($itemsPagePreferences.page) || 1));
+    // view opens on. Skill routes and links always open on page 1.
+    const historyBasePage = untrack(() => (opensOnFirstPage ? 1 : Number($itemsPagePreferences.page) || 1));
     let perPageSelected = $state($itemsPagePreferences.perPage || '12');
-    let filterSelected = $state($itemsPagePreferences.filter || 'all');
+    let filterFromLink = linkView !== null;
+    let sortFromLink = linkView !== null;
+    let profitFromLink = linkView !== null;
+    let filterSelected = $state(linkView?.filter ?? ($itemsPagePreferences.filter || 'all'));
     let sortOrderSelected = $state(
-        normalizeSortSelection($itemsPagePreferences.sortOrder, $itemsPagePreferences.profitMode ?? false),
+        linkView?.sort ??
+            normalizeSortSelection($itemsPagePreferences.sortOrder, $itemsPagePreferences.profitMode ?? false),
     );
     let useSuppliesChecked = $state($itemsPagePreferences.useSupplies ?? false);
-    let profitModeChecked = $state($itemsPagePreferences.profitMode ?? false);
+    let profitModeChecked = $state(linkView?.profit ?? $itemsPagePreferences.profitMode ?? false);
     const perPageValue = $derived(Number(perPageSelected) || 12);
     const perPageLabel = $derived(`${perPageValue}`);
     const filterLabel = $derived(
@@ -164,18 +171,23 @@
     });
 
     // Keep local selection state in sync with persisted preferences (e.g., when storage events fire).
+    // Controls that came from a shared link are left alone (see linkView).
     $effect(() => {
-        if ($itemsPagePreferences.filter !== filterSelected) {
+        if (!filterFromLink && $itemsPagePreferences.filter !== filterSelected) {
             filterSelected = $itemsPagePreferences.filter || 'all';
         }
-        const prefOrder = $itemsPagePreferences.sortOrder || 'desc';
-        const profitPrefEnabled = $itemsPagePreferences.profitMode ?? false;
-        const normalizedOrder = normalizeSortSelection(prefOrder, profitPrefEnabled);
-        if (normalizedOrder !== sortOrderSelected) {
-            sortOrderSelected = normalizedOrder;
-        }
-        if (normalizedOrder !== prefOrder) {
-            itemsPagePreferences.set({ ...$itemsPagePreferences, sortOrder: normalizedOrder });
+        if (!sortFromLink) {
+            const prefOrder = $itemsPagePreferences.sortOrder || 'desc';
+            // While profit mode comes from the link, judge the sort against what is on screen, not
+            // the saved setting, or an ROI sort picked under the link's profit mode would flip back.
+            const profitEnabled = profitFromLink ? profitModeChecked : ($itemsPagePreferences.profitMode ?? false);
+            const normalizedOrder = normalizeSortSelection(prefOrder, profitEnabled);
+            if (normalizedOrder !== sortOrderSelected) {
+                sortOrderSelected = normalizedOrder;
+            }
+            if (!profitFromLink && normalizedOrder !== prefOrder) {
+                itemsPagePreferences.set({ ...$itemsPagePreferences, sortOrder: normalizedOrder });
+            }
         }
         if ($itemsPagePreferences.perPage !== perPageSelected) {
             perPageSelected = $itemsPagePreferences.perPage || '12';
@@ -183,10 +195,56 @@
         if ($itemsPagePreferences.useSupplies !== useSuppliesChecked) {
             useSuppliesChecked = $itemsPagePreferences.useSupplies ?? false;
         }
-        if ($itemsPagePreferences.profitMode !== profitModeChecked) {
+        if (!profitFromLink && $itemsPagePreferences.profitMode !== profitModeChecked) {
             profitModeChecked = $itemsPagePreferences.profitMode ?? false;
         }
     });
+
+    const currentView: ItemsView = $derived({
+        filter: filterSelected,
+        sort: sortOrderSelected,
+        profit: profitModeChecked,
+    });
+
+    // Mirror the view into the address bar, including saved settings on a bare URL, so what's on screen
+    // is always what the address bar shares. replaceState adds nothing to the back button, and passing
+    // page.state keeps the pagination entries. SvelteKit refuses replaceState until the router has
+    // started, which is only after the first load's afterNavigate callbacks, hence the timeout.
+    // It also re-runs after each navigation and each Back/Forward between pagination entries
+    // (page.state), since those can put a different URL in the address bar than what is shown.
+    let addressBarReady = $state(false);
+    let navigations = $state(0);
+    afterNavigate(() => {
+        setTimeout(() => {
+            addressBarReady = true;
+            navigations++;
+        });
+    });
+    $effect(() => {
+        const view = currentView;
+        void navigations;
+        void page.state;
+        if (!addressBarReady) return;
+        untrack(() => {
+            const current = addressBarUrl();
+            const next = itemsViewPath(current.pathname, current.searchParams, view);
+            if (next === current.pathname + current.search) return;
+            // The path is the address bar's own, so it's already resolved.
+            // eslint-disable-next-line svelte/no-navigation-without-resolve
+            replaceState(next, { ...page.state });
+        });
+    });
+
+    async function copyViewLink() {
+        const link = location.origin + itemsViewPath(location.pathname, new URLSearchParams(), currentView);
+        try {
+            if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+            await navigator.clipboard.writeText(link);
+            toast.success('Link copied');
+        } catch {
+            toast.error("Couldn't copy. Copy the address bar instead.");
+        }
+    }
 
     // Reset pagination whenever a skill-specific route is entered.
     $effect(() => {
@@ -333,10 +391,13 @@
     // (see handlePaginationPageChange), so whichever entry we land on tells us what to show;
     // SvelteKit restores that entry's scroll position itself. Reading currentPage untracked keeps
     // this from re-running — and snapping the page back — when a filter or sort resets it to 1.
+    // A derived, so replaceState handing over a new page.state with the same page number doesn't
+    // re-run this and undo a filter or sort change's reset to page 1.
+    const entryPage = $derived(page.state.itemsPage ?? historyBasePage);
     $effect(() => {
-        const entryPage = page.state.itemsPage ?? historyBasePage;
+        const target = entryPage;
         untrack(() => {
-            if (entryPage !== currentPage) currentPage = entryPage;
+            if (target !== currentPage) currentPage = target;
         });
     });
 
@@ -356,6 +417,7 @@
     }
 
     function handleFilterChange(value: string) {
+        filterFromLink = false;
         filterSelected = value || 'all';
         itemsPagePreferences.set({ ...$itemsPagePreferences, filter: filterSelected });
         currentPage = 1;
@@ -363,15 +425,11 @@
     }
 
     function normalizeSortSelection(value?: string | null, profitEnabled = profitModeChecked) {
-        if (!value) return 'desc';
-        const resolved = legacySortValues[value] ?? value;
-        if (profitSortValues.includes(resolved)) {
-            return profitEnabled ? resolved : 'desc';
-        }
-        return 'desc';
+        return normalizeSort(value, profitEnabled);
     }
 
     function handleSortChange(value: string) {
+        sortFromLink = false;
         const normalized = normalizeSortSelection(value, profitModeEnabled);
         sortOrderSelected = normalized;
         itemsPagePreferences.update((prefs) => ({ ...prefs, sortOrder: normalized }));
@@ -404,12 +462,15 @@
         const nextSortOrder = normalizeSortSelection(sortOrderSelected, value);
         if (nextSortOrder !== sortOrderSelected) {
             sortOrderSelected = nextSortOrder;
+            // Losing an ROI sort is a consequence of the visitor's own toggle, so it saves too.
+            sortFromLink = false;
         }
         profitModeChecked = value;
+        profitFromLink = false;
         itemsPagePreferences.update((prefs) => ({
             ...prefs,
             profitMode: value,
-            sortOrder: nextSortOrder,
+            ...(sortFromLink ? {} : { sortOrder: nextSortOrder }),
         }));
         skipCacheOnce = true;
         forceLoading = true;
@@ -564,6 +625,10 @@
                             </Select.Content>
                         </Select.Root>
                     </div>
+                    <Button variant="outline" onclick={copyViewLink}>
+                        <Link2 class="h-4 w-4" />
+                        Copy link
+                    </Button>
                 </div>
             </div>
         </div>
