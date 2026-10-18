@@ -51,7 +51,9 @@ async function get(path: string): Promise<Response> {
     const url = `${baseUrl}${path}`;
     for (let attempt = 0; ; attempt++) {
         try {
-            const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) });
+            const fetched = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) });
+            // Read the body here so a body that stalls past the timeout is caught below too.
+            const response = new Response(await fetched.arrayBuffer(), fetched);
             // One retry, for serverless cold starts.
             if (response.status < 500 || attempt === 1) return response;
         } catch (error) {
@@ -76,11 +78,20 @@ type Head = {
     canonicals: string[];
     ogTitles: string[];
     robots: string[];
+    ogImages: string[];
     usedIn: boolean;
 };
 
 async function readHead(html: string): Promise<Head> {
-    const head: Head = { titles: [], descriptions: [], canonicals: [], ogTitles: [], robots: [], usedIn: false };
+    const head: Head = {
+        titles: [],
+        descriptions: [],
+        canonicals: [],
+        ogTitles: [],
+        robots: [],
+        ogImages: [],
+        usedIn: false,
+    };
     await new HTMLRewriter()
         .on('head > title', {
             element() {
@@ -95,6 +106,7 @@ async function readHead(html: string): Promise<Head> {
         })
         .on('link[rel="canonical"]', { element: (e) => void head.canonicals.push(e.getAttribute('href') ?? '') })
         .on('meta[property="og:title"]', { element: (e) => void head.ogTitles.push(e.getAttribute('content') ?? '') })
+        .on('meta[property="og:image"]', { element: (e) => void head.ogImages.push(e.getAttribute('content') ?? '') })
         .on('meta[name="robots"]', { element: (e) => void head.robots.push(e.getAttribute('content') ?? '') })
         .on('[data-seo-used-in]', { element: () => void (head.usedIn = true) })
         .transform(new Response(html))
@@ -102,6 +114,7 @@ async function readHead(html: string): Promise<Head> {
     head.titles = head.titles.map(decode);
     head.descriptions = head.descriptions.map(decode);
     head.canonicals = head.canonicals.map(decode);
+    head.ogImages = head.ogImages.map(decode);
     return head;
 }
 
@@ -172,6 +185,7 @@ const targets = sample
     : locs;
 const titleOwners = new Map<string, string>();
 let ingredientPages = 0;
+const itemImages: string[] = [];
 
 async function auditIndexable(loc: string) {
     const path = new URL(loc).pathname;
@@ -190,6 +204,16 @@ async function auditIndexable(loc: string) {
         head.robots.length === 1 && head.robots[0] === 'index, follow',
         `${path}: robots "${head.robots.join(' | ')}"`,
     );
+
+    // Share images come from the host that served the page, and item pages each have their own.
+    const image = head.ogImages[0] ?? '';
+    check(head.ogImages.length === 1, `${path}: ${head.ogImages.length} og:image tags`);
+    check(image.startsWith(`${new URL(baseUrl).origin}/`), `${path}: og:image "${image}" is on another host`);
+    const itemId = path.match(/^\/items\/(\d+)$/)?.[1];
+    if (itemId) {
+        check(image.includes(`/og/items/${itemId}.png`), `${path}: og:image "${image}" is not the item's own`);
+        itemImages.push(new URL(image).pathname + new URL(image).search);
+    }
 
     const title = head.titles[0] ?? '';
     check(title.length > 0 && title.length <= 60, `${path}: title length ${title.length} ("${title}")`);
@@ -219,7 +243,24 @@ await pool(targets, async (loc) => {
 });
 console.log(`Audited ${targets.length} pages (${ingredientPages} ingredient-only)`);
 
-// 4. pages that must stay out of the index
+// 4. a sample of item share images: each must be a 1200×630 PNG
+const imageSample = itemImages.sort(() => Math.random() - 0.5).slice(0, 20);
+await pool(imageSample, async (path) => {
+    const response = await get(path);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    check(response.status === 200, `${path}: status ${response.status}`);
+    check(
+        response.headers.get('content-type') === 'image/png',
+        `${path}: served as ${response.headers.get('content-type')}`,
+    );
+    // A PNG's width and height are the first two fields of its IHDR chunk, at bytes 16 and 20.
+    const view = new DataView(bytes.buffer);
+    const size = bytes.length >= 24 ? `${view.getUint32(16)}×${view.getUint32(20)}` : 'unreadable';
+    check(size === '1200×630', `${path}: image is ${size}`);
+});
+console.log(`Fetched ${imageSample.length} item share images`);
+
+// 5. pages that must stay out of the index
 const noindexPaths = [
     '/favorites',
     '/hidden',

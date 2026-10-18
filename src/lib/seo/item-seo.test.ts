@@ -136,6 +136,22 @@ describe('buildItemSeo', () => {
     );
 });
 
+describe('share image', () => {
+    it("points every item page at the item's own image, with alt text", () => {
+        const recipe = buildItemSeo(makeItem({ creationSpecs: [smithingSpec as never] }), EMPTY_USED_IN);
+        expect(recipe.image).toBe('/og/items/2.png?v=1');
+        expect(recipe.imageAlt).toBe('Cannonball: an OSRS Smithing 35 recipe. Costs and profit on Aris Maye.');
+
+        const copy = buildItemSeo(makeItem({ id: 3, noted: true }), EMPTY_USED_IN);
+        expect(copy.image).toBe('/og/items/3.png?v=1');
+    });
+
+    it('keeps the site image while an item is loading or missing', () => {
+        expect(itemPageSeo({ itemId: '2', gameItem: null, loadProblem: null }).image).toBeUndefined();
+        expect(itemPageSeo({ itemId: '2', gameItem: null, loadProblem: 'missing' }).image).toBeUndefined();
+    });
+});
+
 describe('itemPageSeo', () => {
     const cannonball = makeItem({ creationSpecs: [smithingSpec as never] });
 
