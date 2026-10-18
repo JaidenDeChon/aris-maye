@@ -61,6 +61,13 @@
     </p>
 {/each}
 
+<p class="text-sm text-muted-foreground">
+    Training to a goal? The
+    <a href={resolve('/calculators/[skill=xpSkill]', { skill: skill.slug })} class="underline hover:text-primary"
+        >{skill.title} calculator</a
+    > works out how many of each you'd need and the total cost.
+</p>
+
 {#if moneyMakers}
     <p class="text-sm text-muted-foreground">
         Want gold rather than XP? See the

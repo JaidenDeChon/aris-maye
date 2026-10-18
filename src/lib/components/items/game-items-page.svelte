@@ -565,12 +565,20 @@
             {/if}
             <h1 class="text-3xl font-bold">{headingLabel}</h1>
             {#if xpGuide}
-                <a
-                    href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: xpGuide.slug })}
-                    class="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline sm:ml-auto"
-                >
-                    Cheapest {xpGuide.title} XP →
-                </a>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 sm:ml-auto">
+                    <a
+                        href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: xpGuide.slug })}
+                        class="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                    >
+                        Cheapest {xpGuide.title} XP →
+                    </a>
+                    <a
+                        href={resolve('/calculators/[skill=xpSkill]', { skill: xpGuide.slug })}
+                        class="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                    >
+                        {xpGuide.title} calculator →
+                    </a>
+                </div>
             {/if}
         </div>
     </div>

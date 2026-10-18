@@ -43,4 +43,9 @@
             </li>
         {/each}
     </ul>
+    <p class="text-sm text-muted-foreground">
+        Working towards a level? The
+        <a href={resolve('/calculators')} class="underline hover:text-primary">skill calculators</a> show how many of each
+        thing to make and what it costs.
+    </p>
 </GuideSection>
