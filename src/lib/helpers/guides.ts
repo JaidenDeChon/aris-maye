@@ -1,5 +1,6 @@
 import { XP_LEVEL_BANDS } from '$lib/constants/guides';
 import type { HomepageAlchPick } from '$lib/models/homepage';
+import type { CalculatorMethod } from '$lib/models/calculators';
 import type { CheapestXpGuide, MarketSummary, XpMethod } from '$lib/models/guides';
 
 /** The level range a method belongs to. A missing level counts as 1, and anything past 99 as 99. */
@@ -52,7 +53,16 @@ export function netCostPerXp(method: Pick<XpMethod, 'item' | 'xp'>): number {
  * into a money-making one, led by things like a 3rd age axe that pays a fortune for 5 XP.
  */
 export function compareXpMethods(a: XpMethod, b: XpMethod): number {
-    return a.gpPerXp - b.gpPerXp || b.xp - a.xp || a.item.name.localeCompare(b.item.name);
+    return compareXpCost(a, b) || a.item.name.localeCompare(b.item.name);
+}
+
+/** `compareXpMethods` for the calculators' slimmer rows, so both rank methods the same way. */
+export function compareCalculatorMethods(a: CalculatorMethod, b: CalculatorMethod): number {
+    return compareXpCost(a, b) || a.name.localeCompare(b.name);
+}
+
+function compareXpCost(a: { gpPerXp: number; xp: number }, b: { gpPerXp: number; xp: number }): number {
+    return a.gpPerXp - b.gpPerXp || b.xp - a.xp;
 }
 
 /** Each skill's single cheapest method across its level bands, for the cheapest-XP overview. */

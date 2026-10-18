@@ -31,7 +31,9 @@ import {
 import { HOMEPAGE_SNAPSHOT_MAX_AGE_MS } from '$lib/constants/homepage';
 import { VOLUME_HISTORY_HOURS } from '$lib/constants/market';
 import { canonicalSkill } from '$lib/constants/skill-aliases';
-import { compareXpMethods, levelBand, summarizeChanges } from '$lib/helpers/guides';
+import { CALCULATOR_SNAPSHOT_VERSION } from '$lib/constants/calculators';
+import { compareCalculatorMethods, compareXpMethods, levelBand, summarizeChanges } from '$lib/helpers/guides';
+import type { CalculatorMethod, CalculatorSnapshot } from '$lib/models/calculators';
 import type {
     CheapestXpGuide,
     HighAlchGuide,
@@ -127,12 +129,19 @@ export async function computeHighAlch(): Promise<HighAlchGuide> {
     return { computedAt: Date.now(), natureRunePrice, picks };
 }
 
-type RawXpRow = RawItem & {
+export type RawXpRow = RawItem & {
     xpSkill: string;
     xp: number;
     gpPerXp: number;
     requiredSkills?: { skillName?: string; skillLevel?: number }[];
 };
+
+/** The level a method needs in its XP skill, or 1 when the recipe lists none. */
+function methodLevel(row: RawXpRow, skill: string): number {
+    // The level comes from the requirement in the same skill, whichever way the recipe spells it.
+    const requirement = (row.requiredSkills ?? []).find((req) => canonicalSkill(req.skillName) === skill);
+    return typeof requirement?.skillLevel === 'number' && requirement.skillLevel > 0 ? requirement.skillLevel : 1;
+}
 
 /** The cheapest XP rows for each guide skill, bucketed by level band. Pure, for the data check. */
 export function bucketXpRows(rows: RawXpRow[]): CheapestXpGuide['skills'] {
@@ -142,10 +151,7 @@ export function bucketXpRows(rows: RawXpRow[]): CheapestXpGuide['skills'] {
     for (const row of rows) {
         const skill = canonicalSkill(row.xpSkill);
         if (!guideSkills.has(skill)) continue;
-        // The level comes from the requirement in the same skill, whichever way the recipe spells it.
-        const requirement = (row.requiredSkills ?? []).find((req) => canonicalSkill(req.skillName) === skill);
-        const level =
-            typeof requirement?.skillLevel === 'number' && requirement.skillLevel > 0 ? requirement.skillLevel : 1;
+        const level = methodLevel(row, skill);
         const key = `${skill}:${levelBand(level).min}`;
         const bucket = buckets.get(key) ?? [];
         bucket.push({ item: toHomepageItem(row), level, xp: row.xp, gpPerXp: row.gpPerXp });
@@ -163,13 +169,12 @@ export function bucketXpRows(rows: RawXpRow[]): CheapestXpGuide['skills'] {
 }
 
 /**
- * The cheapest way to get XP by making things, for each guide skill and level band, valued for a
- * main from GE prices. One pass of the profit pipeline; the bucketing happens here rather than in
- * Mongo so it doesn't depend on the server's version.
+ * Every way to get XP by making things, valued for a main from GE prices: one row per item and
+ * skill it gives XP in. One pass of the profit pipeline, shared by the cheapest XP guide and the
+ * calculators so the two can't disagree.
  */
-export async function computeCheapestXp(): Promise<CheapestXpGuide> {
-    const natureRunePrice = await getNatureRunePrice();
-    const rows = await OsrsboxItemModel.aggregate<RawXpRow>([
+export async function fetchXpRows(natureRunePrice: number): Promise<RawXpRow[]> {
+    return OsrsboxItemModel.aggregate<RawXpRow>([
         { $match: baseCreationMatch(false) },
         { $unset: ['equipment', 'weapon'] },
         ...buildProfitPipeline(null, true, false, false, false, natureRunePrice),
@@ -201,8 +206,41 @@ export async function computeCheapestXp(): Promise<CheapestXpGuide> {
             },
         },
     ] as unknown as PipelineStage[]).allowDiskUse(true);
+}
 
+/**
+ * The cheapest way to get XP by making things, for each guide skill and level band. The bucketing
+ * happens here rather than in Mongo so it doesn't depend on the server's version.
+ */
+export async function computeCheapestXp(): Promise<CheapestXpGuide> {
+    const rows = await fetchXpRows(await getNatureRunePrice());
     return { computedAt: Date.now(), skills: bucketXpRows(rows) };
+}
+
+/** Every method for each calculator skill, as slim rows, cheapest XP first. Pure, for the data check. */
+export function groupCalculatorMethods(rows: RawXpRow[]): CalculatorSnapshot['skills'] {
+    const skills: CalculatorSnapshot['skills'] = Object.fromEntries(XP_GUIDE_SKILLS.map(({ slug }) => [slug, []]));
+    for (const row of rows) {
+        const skill = canonicalSkill(row.xpSkill);
+        const methods = skills[skill];
+        if (!methods) continue;
+        methods.push({
+            id: row.id,
+            name: row.name,
+            level: methodLevel(row, skill),
+            xp: row.xp,
+            netCost: -(row.creationProfit ?? 0),
+            gpPerXp: row.gpPerXp,
+        });
+    }
+    for (const methods of Object.values(skills)) methods.sort(compareCalculatorMethods);
+    return skills;
+}
+
+/** The calculators' data: every method for each skill, valued from GE prices. */
+export async function computeCalculatorMethods(): Promise<CalculatorSnapshot> {
+    const rows = await fetchXpRows(await getNatureRunePrice());
+    return { computedAt: Date.now(), skills: groupCalculatorMethods(rows) };
 }
 
 /** The homepage's Ironman corner, at full length. Nothing here depends on the GE. */
@@ -267,28 +305,72 @@ export function refreshGuideSnapshot<K extends GuideKey>(key: K): Promise<GuideS
     return guideCache(key).refresh();
 }
 
-/** When each guide's stored snapshot was built, for the status endpoint. */
+const calculatorCache = createSnapshotCache<CalculatorSnapshot>({
+    collection: mongoSnapshotCollection(GUIDE_SNAPSHOT_COLLECTION),
+    key: `calculators-v${CALCULATOR_SNAPSHOT_VERSION}`,
+    compute: computeCalculatorMethods,
+    maxAgeMs: HOMEPAGE_SNAPSHOT_MAX_AGE_MS,
+});
+
+/** Rebuilds the calculators' data now. The hourly price job calls this through the refresh endpoint. */
+export function refreshCalculatorSnapshot(): Promise<CalculatorSnapshot> {
+    return calculatorCache.refresh();
+}
+
+/** When each guide's stored snapshot, and the calculators', was built, for the status endpoint. */
 export async function getGuideStatus(): Promise<
     Record<string, { computedAt: number | null; rebuildingAt: number | null }>
 > {
     const keys = Object.keys(builders) as GuideKey[];
-    const statuses = await Promise.all(keys.map((key) => guideCache(key).status()));
-    return Object.fromEntries(keys.map((key, i) => [`${key}-v${GUIDE_SNAPSHOT_VERSION}`, statuses[i]]));
+    const [statuses, calculators] = await Promise.all([
+        Promise.all(keys.map((key) => guideCache(key).status())),
+        calculatorCache.status(),
+    ]);
+    return {
+        ...Object.fromEntries(keys.map((key, i) => [`${key}-v${GUIDE_SNAPSHOT_VERSION}`, statuses[i]])),
+        [`calculators-v${CALCULATOR_SNAPSHOT_VERSION}`]: calculators,
+    };
 }
 
 /**
  * A guide page's server load: its snapshot, or a 503 when there's none to show. A guide never
  * renders as a 200 with empty tables, which would tell search engines the page is thin.
  */
-export async function loadGuide<K extends GuideKey>(
+export function loadGuide<K extends GuideKey>(
     key: K,
     setHeaders: (headers: Record<string, string>) => void,
 ): Promise<GuideSnapshots[K]> {
+    return loadOr503(() => getGuideSnapshot(key), `the ${key} guide`, 'This guide', setHeaders);
+}
+
+/**
+ * A skill calculator's server load: every method for the skill and when they were priced, or a
+ * 503, for the same reason as a guide.
+ */
+export async function loadCalculatorMethods(
+    skill: string,
+    setHeaders: (headers: Record<string, string>) => void,
+): Promise<{ computedAt: number; methods: CalculatorMethod[] }> {
+    const snapshot = await loadOr503(
+        () => calculatorCache.getFresh(),
+        'the calculators',
+        'This calculator',
+        setHeaders,
+    );
+    return { computedAt: snapshot.computedAt, methods: snapshot.skills[skill] ?? [] };
+}
+
+async function loadOr503<T>(
+    load: () => Promise<T>,
+    label: string,
+    pageName: string,
+    setHeaders: (headers: Record<string, string>) => void,
+): Promise<T> {
     try {
-        return await getGuideSnapshot(key);
+        return await load();
     } catch (cause) {
-        console.error(`Failed to load the ${key} guide:`, cause);
+        console.error(`Failed to load ${label}:`, cause);
         setHeaders({ 'retry-after': '600' });
-        error(503, 'This guide is being rebuilt. Try again in a few minutes.');
+        error(503, `${pageName} is being rebuilt. Try again in a few minutes.`);
     }
 }
