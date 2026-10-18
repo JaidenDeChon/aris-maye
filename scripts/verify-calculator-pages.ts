@@ -128,7 +128,8 @@ console.log('\n# Icons');
             `An icon answers 200 with an image (${response.status} ${response.headers.get('content-type')})`,
         );
         check(
-            response.headers.get('cache-control') === 'public, max-age=86400',
+            // Netlify drops the space after the comma.
+            response.headers.get('cache-control')?.replaceAll(' ', '') === 'public,max-age=86400',
             `The icon's Cache-Control is a day (${response.headers.get('cache-control')})`,
         );
         // Netlify strips its own CDN header from what reaches the browser, so only check it locally.
