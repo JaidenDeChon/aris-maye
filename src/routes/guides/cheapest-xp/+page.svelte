@@ -25,7 +25,10 @@
     computedAt={data.guide.computedAt}
 />
 
-<GuideSection title="Cheapest method per skill" blurb="At any level. Some of these need a high level to make.">
+<GuideSection
+    title="Cheapest method per skill"
+    blurb="Cheapest at any level, so some of these need a high level to make."
+>
     <GuideTable rowCount={rows.length} empty="No XP methods have prices right now." caption="Cheapest XP per skill">
         {#snippet head()}
             <Table.Head>Skill</Table.Head>
@@ -65,8 +68,8 @@
             with what it earns per XP in green, and among those the one with the most XP each ranks first.
         </p>
         <p>
-            This is the cost of XP, not the speed. A cheap method can still be slow if each action takes a while, so
-            check the method before you commit to it.
+            This ranks by cost alone. A cheap method can still be slow if each action takes a while, so check how fast
+            it is before you commit to it.
         </p>
     </div>
 </GuideSection>

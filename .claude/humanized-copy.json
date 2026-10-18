@@ -3,6 +3,10 @@
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
     },
+    "src/routes/guides/cheapest-xp/+page.svelte": {
+        "humanized_at": "2026-10-18T03:13:27Z",
+        "sha256": "055cdca5c332564004d35c8510f82eab42d6610f8d620e20e9d3ce3dec119767"
+    },
     "src/routes/guides/high-alch/+page.svelte": {
         "humanized_at": "2026-10-18T03:13:10Z",
         "sha256": "71a286d0d7032d3da1f5e3502aaf3f4354f9111f6ef670adda1b72c13298e38b"
