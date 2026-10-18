@@ -12,7 +12,7 @@
 
 <GuideHeader
     title="OSRS guides"
-    answer="Answers to the questions players ask most, worked out from live Grand Exchange prices and updated every hour."
+    answer="Answers to the questions players ask most, worked out from live Grand Exchange and shop prices and updated every hour."
 />
 
 <ul class="grid gap-4 sm:grid-cols-2">

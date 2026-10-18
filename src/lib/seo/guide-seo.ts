@@ -9,7 +9,7 @@ import type { PageSeo } from './page-seo';
 export const guidesHubSeo: PageSeo = {
     title: 'OSRS Money Making & Training Guides · Aris Maye',
     description:
-        'Guides to making money and training skills in OSRS, built from live Grand Exchange prices and updated every hour.',
+        'Guides to making money and training skills in OSRS, built from live Grand Exchange and shop prices and updated every hour.',
     canonicalPath: '/guides',
     robots: 'index',
 };

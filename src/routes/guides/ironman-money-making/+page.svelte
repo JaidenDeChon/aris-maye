@@ -47,7 +47,7 @@
                     {formatGpShort(sale.firstPrice)}
                 </Table.Cell>
                 <Table.Cell class="text-right tabular-nums">
-                    {sale.alchValue > 0 ? formatGpShort(sale.alchValue) : 'Can’t alch'}
+                    {sale.alchValue > 0 ? formatGpShort(sale.alchValue) : "Can't alch"}
                 </Table.Cell>
                 <Table.Cell class="text-right tabular-nums">{formatGpShort(sale.floorPrice)}</Table.Cell>
                 <Table.Cell class="text-right tabular-nums">
