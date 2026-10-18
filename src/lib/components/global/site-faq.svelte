@@ -28,9 +28,8 @@
             question: 'Does this cost money?',
             answer: [
                 'No. This is a passion project, not a money-making one. If you would like to donate to the developer, ' +
-                    'then thank you, first of all! There is a link at the bottom of the main menu!*',
+                    'then thank you, first of all! There is a link at the bottom of the main menu!',
             ],
-            subtext: ['* Still to be set up'],
         },
         {
             value: 'Do I have to make an account?',
