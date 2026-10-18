@@ -9,5 +9,11 @@
 [functions."*"]
   format = "esm"
 
+# `read()` from `$app/server` loads files from .netlify/server/ on disk at runtime. The bundler
+# only packs files it can trace through imports, so the share image's fonts and resvg's
+# WebAssembly would be left out and every render would fail.
+[functions."sveltekit-render"]
+  included_files = [".netlify/server/_app/immutable/assets/**"]
+
 [functions."update-item-prices"]
   schedule = "@hourly"
