@@ -11,3 +11,11 @@ export const SHARE_CARD_HEIGHT = 630;
 export function itemShareImagePath(id: number | string): string {
     return `/og/items/${id}.png?v=${SHARE_CARD_VERSION}`;
 }
+
+/**
+ * Where the market report's share image is served, by `src/routes/og/guides/market.png`. The hour
+ * the report was built is part of the URL, so link previews pick up the new card every hour.
+ */
+export function marketShareImagePath(computedAt: number): string {
+    return `/og/guides/market.png?v=${SHARE_CARD_VERSION}&h=${Math.floor(computedAt / 3_600_000)}`;
+}

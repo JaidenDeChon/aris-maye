@@ -1,3 +1,4 @@
+import { GUIDE_PAGES, XP_GUIDE_SKILLS } from '$lib/constants/guides';
 import { skillTreePages } from '$lib/constants/skill-tree-pages';
 import { canonicalUrl } from './page-seo';
 import { SITE_URL } from './site-url';
@@ -21,7 +22,14 @@ function escapeXml(value: string): string {
 }
 
 export function sitemapUrls(itemIds: number[], base: string = SITE_URL): string[] {
-    const paths = ['/', '/items', ...skillTreePages.map((skill) => `/items/${skill.slug}`)];
+    const paths = [
+        '/',
+        '/items',
+        ...skillTreePages.map((skill) => `/items/${skill.slug}`),
+        '/guides',
+        ...GUIDE_PAGES.map((guide) => guide.path),
+        ...XP_GUIDE_SKILLS.map((skill) => `/guides/cheapest-xp/${skill.slug}`),
+    ];
     for (const id of itemIds) paths.push(`/items/${id}`);
     return [...new Set(paths.map((path) => canonicalUrl(path, base)))];
 }
