@@ -390,7 +390,14 @@ export async function computeShopSales(
     >([
         { $match: { 'storePrices.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
         { $unwind: '$storePrices' },
-        { $match: { 'storePrices.currency': null, 'storePrices.firstPrice': { $gt: 0 } } },
+        // "Unused shops" is a wiki category the scraper picked up, not somewhere a player can sell.
+        {
+            $match: {
+                'storePrices.currency': null,
+                'storePrices.firstPrice': { $gt: 0 },
+                'storePrices.shop': { $ne: 'Unused shops' },
+            },
+        },
         { $set: { alchValue: alchAfterRuneExpr(natureRunePrice) } },
         { $set: { gain: { $subtract: ['$storePrices.firstPrice', '$alchValue'] } } },
         { $match: { gain: { $gt: 0 } } },
