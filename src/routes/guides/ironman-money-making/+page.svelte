@@ -24,7 +24,7 @@
 
 <GuideSection
     title="Sell to shops"
-    blurb="Items a shop pays more for than they alch for. The best-paying shop for each."
+    blurb="Items a shop pays more for than they alch for, with the best-paying shop for each."
 >
     <GuideTable
         rowCount={guide.shopSales.length}
@@ -36,7 +36,7 @@
             <Table.Head>Shop</Table.Head>
             <Table.Head class="text-right">Shop pays</Table.Head>
             <Table.Head class="text-right">Alch value</Table.Head>
-            <Table.Head class="text-right">Lowest price</Table.Head>
+            <Table.Head class="text-right">Lowest it pays</Table.Head>
             <Table.Head class="text-right">Sales to lowest</Table.Head>
         {/snippet}
         {#each guide.shopSales as sale (sale.item.id)}
@@ -70,7 +70,7 @@
         {#snippet head()}
             <Table.Head>Make</Table.Head>
             <Table.Head class="text-right">Profit each</Table.Head>
-            <Table.Head class="text-right">Ingredients from shops</Table.Head>
+            <Table.Head class="text-right">Shop cost of ingredients</Table.Head>
         {/snippet}
         {#each guide.shopSupplied as item (item.id)}
             <Table.Row>

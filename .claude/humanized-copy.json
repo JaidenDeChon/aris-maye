@@ -15,6 +15,10 @@
         "humanized_at": "2026-10-18T03:13:10Z",
         "sha256": "71a286d0d7032d3da1f5e3502aaf3f4354f9111f6ef670adda1b72c13298e38b"
     },
+    "src/routes/guides/ironman-money-making/+page.svelte": {
+        "humanized_at": "2026-10-18T03:14:00Z",
+        "sha256": "d227ece65ae0df960b0fcd49e6e141dfc330b84b9c1637eb726650a1b012eee9"
+    },
     "src/routes/guides/market/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:58Z",
         "sha256": "9e4b2700664442fb4b8bed3eb390d322d50c50d7b4240c87e146e65f32b7a26d"
