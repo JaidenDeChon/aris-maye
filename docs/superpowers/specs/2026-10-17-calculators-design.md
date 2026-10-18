@@ -251,3 +251,36 @@ description, canonical and robots meta.
 - Run the audit and the page check against the preview (reading `osrsbox-dev`).
 - After the production deploy: confirm the Netlify log shows the `calculators` refresh succeeding,
   resubmit the sitemap in Search Console, and inspect `/calculators/herblore`.
+
+## Decisions made during implementation
+
+Real data and the page checks showed cases the design above didn't anticipate. The code follows
+these, and they take precedence over the sections above where the two differ.
+
+- **Usable methods first, then the rest by the level they unlock at.** The guide's flat ranking
+  counts everything that pays as free, so at level 1 the table opened on level 80+ methods. Methods
+  the player can use keep the cheapest-XP order, and locked ones follow in unlock order.
+- **The summary says where the skill starts.** Herblore has nothing at level 1 (the first method is
+  level 3), so the default page says "The first method opens at level 3" instead of only "nothing".
+- **A switch, not a checkbox,** for "Only methods I can use now", matching the switches on `/items`.
+- **Page weight.** Herblore's HTML is about 560 KB in dev, nearly all table markup for 241 rows. It
+  compresses to 44 KB with gzip, against 26 KB for a page with no table, so the table costs about
+  18 KB on the wire. Icons load lazily from the icon endpoint.
+- **The data check also compares net cost,** not only level, XP and GP per XP.
+- **The GE tax description says "the tax rate"** rather than "2%", so it passes the no-live-figures
+  test. The rate on the page itself comes from `GE_TAX_RATE`.
+
+Results on `osrsbox-prod` (the same on `osrsbox-dev`):
+
+| Skill        | Methods |
+| ------------ | ------- |
+| Construction | 78      |
+| Cooking      | 121     |
+| Crafting     | 224     |
+| Fletching    | 147     |
+| Herblore     | 241     |
+| Magic        | 108     |
+| Runecrafting | 27      |
+| Smithing     | 201     |
+
+The snapshot builds in about 1.6 s and is 102 KB stored.

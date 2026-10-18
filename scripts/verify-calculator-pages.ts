@@ -317,11 +317,7 @@ console.log('\n# Links');
 
     await page.goto(`${baseUrl}/items/smithing`);
     await settle(page);
-    await follow(
-        page.getByRole('link', { name: /Smithing calculator/ }),
-        '/calculators/smithing',
-        '/items/smithing',
-    );
+    await follow(page.getByRole('link', { name: /Smithing calculator/ }), '/calculators/smithing', '/items/smithing');
     await close();
 }
 
