@@ -97,11 +97,23 @@ export function methodTotals(method: CalculatorMethod, goal: SkillGoal): MethodT
     return { count, totalCost: count * method.netCost, usable: method.level <= currentLevel(goal) };
 }
 
-/** The methods to list: all of them, or only the usable ones when the player asked for that. */
+/**
+ * The methods to list: the ones the player can use, in cheapest-XP order, then the rest in the
+ * order they unlock. Without the split, a low-level player's list would open on high-level methods
+ * that pay, since anything that pays ranks as free. With `canUseOnly`, only the first part.
+ */
 export function visibleMethods(methods: CalculatorMethod[], goal: SkillGoal): CalculatorMethod[] {
-    if (!goal.canUseOnly) return methods;
     const level = currentLevel(goal);
-    return methods.filter((method) => method.level <= level);
+    const usable = methods.filter((method) => method.level <= level);
+    if (goal.canUseOnly) return usable;
+    // A stable sort, so methods that unlock at the same level keep their cheapest-XP order.
+    const locked = methods.filter((method) => method.level > level).sort((a, b) => a.level - b.level);
+    return [...usable, ...locked];
+}
+
+/** The lowest level any method needs, or null when there are none. */
+export function firstMethodLevel(methods: CalculatorMethod[]): number | null {
+    return methods.length ? Math.min(...methods.map((method) => method.level)) : null;
 }
 
 /** The cheapest method the player can use now. The list comes ranked, so it's the first usable one. */

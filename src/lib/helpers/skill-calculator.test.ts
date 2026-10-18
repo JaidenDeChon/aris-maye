@@ -4,6 +4,7 @@ import {
     DEFAULT_SKILL_GOAL,
     cheapestUsable,
     currentLevel,
+    firstMethodLevel,
     hasGoalStart,
     methodTotals,
     parseSkillGoal,
@@ -131,9 +132,19 @@ describe('methodTotals', () => {
 describe('visibleMethods and cheapestUsable', () => {
     const methods = [method(1, 80, 100, 0), method(2, 30, 50, 10), method(3, 1, 10, 20)];
 
-    it('lists everything unless asked to hide what needs a higher level', () => {
-        expect(visibleMethods(methods, goal(40, 99))).toHaveLength(3);
+    it('lists what the player can use first, then the rest by level, unless asked to hide the rest', () => {
+        expect(visibleMethods(methods, goal(40, 99)).map((m) => m.id)).toEqual([2, 3, 1]);
+        expect(visibleMethods(methods, goal(85, 99)).map((m) => m.id)).toEqual([1, 2, 3]);
+        expect(visibleMethods(methods, goal(1, 99)).map((m) => m.id)).toEqual([3, 2, 1]);
+        const sameLevel = [method(4, 50, 100, 0), method(5, 50, 10, 5), method(6, 20, 10, 9)];
+        expect(visibleMethods(sameLevel, goal(1, 99)).map((m) => m.id)).toEqual([6, 4, 5]);
         expect(visibleMethods(methods, goal(40, 99, true)).map((m) => m.id)).toEqual([2, 3]);
+    });
+
+    it('finds the lowest level any method needs', () => {
+        expect(firstMethodLevel(methods)).toBe(1);
+        expect(firstMethodLevel([method(1, 3, 10, 1), method(2, 9, 10, 1)])).toBe(3);
+        expect(firstMethodLevel([])).toBeNull();
     });
 
     it('picks the first usable method', () => {

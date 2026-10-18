@@ -17,6 +17,7 @@
     import {
         cheapestUsable,
         currentLevel,
+        firstMethodLevel,
         hasGoalStart,
         methodTotals,
         skillGoalParams,
@@ -39,6 +40,7 @@
     const needed = $derived(xpNeeded(goal));
     const level = $derived(currentLevel(goal));
     const best = $derived(cheapestUsable(data.methods, goal));
+    const opensAt = $derived(firstMethodLevel(data.methods));
     const bestTotals = $derived(best ? methodTotals(best, goal) : null);
     const rows = $derived(
         visibleMethods(data.methods, goal).map((method) => ({ method, totals: methodTotals(method, goal) })),
@@ -122,7 +124,11 @@
         {:else}
             <div class="flex flex-col gap-0.5 sm:col-span-2">
                 <dt class="text-muted-foreground">Cheapest at level {level}</dt>
-                <dd class="text-base font-medium">Nothing priced right now can be made at level {level}.</dd>
+                <dd class="text-base font-medium">
+                    {opensAt === null
+                        ? 'No method has a price right now.'
+                        : `Nothing here can be made at level ${level}. The first method opens at level ${opensAt}.`}
+                </dd>
             </div>
         {/if}
     </dl>
@@ -130,7 +136,7 @@
 
 <GuideSection
     title="Every {skill.title} method"
-    blurb="Cheapest XP first. Live Grand Exchange prices, buying the materials and selling what you make. It doesn't count boosts, outfits or how fast each one is."
+    blurb="What you can use now, cheapest XP first, then the rest in the order they unlock. Live Grand Exchange prices, buying the materials and selling what you make. It doesn't count boosts, outfits or how fast each one is."
 >
     {#snippet actions()}
         <div class="flex items-center gap-2">
