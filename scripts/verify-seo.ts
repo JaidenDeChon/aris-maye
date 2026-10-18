@@ -51,7 +51,9 @@ async function get(path: string): Promise<Response> {
     const url = `${baseUrl}${path}`;
     for (let attempt = 0; ; attempt++) {
         try {
-            const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) });
+            const fetched = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) });
+            // Read the body here so a body that stalls past the timeout is caught below too.
+            const response = new Response(await fetched.arrayBuffer(), fetched);
             // One retry, for serverless cold starts.
             if (response.status < 500 || attempt === 1) return response;
         } catch (error) {
