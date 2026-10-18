@@ -11,6 +11,10 @@
         "humanized_at": "2026-10-18T03:14:33Z",
         "sha256": "ad5ca4810b270e36ded3e8eab132bbae27f63eece207b36b3ac9299f77cb750e"
     },
+    "src/routes/calculators/[skill=xpSkill]/+page.svelte": {
+        "humanized_at": "2026-10-18T05:27:26Z",
+        "sha256": "149598ddab280719801c80ee176b06b0a62215ce6c63705144d5c5cb215e753f"
+    },
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"

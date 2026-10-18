@@ -86,7 +86,7 @@
 
 <GuideHeader
     title="{skill.title} calculator"
-    answer="How many of each thing to make to reach your {skill.title} goal, and what it costs at today's Grand Exchange prices."
+    answer="How many of each item you'd need to make to reach your {skill.title} goal, and what it costs at today's Grand Exchange prices."
     computedAt={data.computedAt}
 />
 
@@ -106,11 +106,11 @@
         {#if needed === 0}
             <div class="flex flex-col gap-0.5 sm:col-span-2">
                 <dt class="text-muted-foreground">Goal</dt>
-                <dd class="text-base font-medium">You're already there. Pick a higher target.</dd>
+                <dd class="text-base font-medium">You're already at your target. Set a higher one.</dd>
             </div>
         {:else if best && bestTotals}
             <div class="flex flex-col gap-0.5">
-                <dt class="text-muted-foreground">Cheapest at level {level}</dt>
+                <dt class="text-muted-foreground">Cheapest XP at level {level}</dt>
                 <dd class="text-base font-medium">
                     {bestTotals.count.toLocaleString('en-US')} × {best.name}
                 </dd>
@@ -123,11 +123,11 @@
             </div>
         {:else}
             <div class="flex flex-col gap-0.5 sm:col-span-2">
-                <dt class="text-muted-foreground">Cheapest at level {level}</dt>
+                <dt class="text-muted-foreground">Cheapest XP at level {level}</dt>
                 <dd class="text-base font-medium">
                     {opensAt === null
-                        ? 'No method has a price right now.'
-                        : `Nothing here can be made at level ${level}. The first method opens at level ${opensAt}.`}
+                        ? 'No method has a Grand Exchange price right now.'
+                        : `You can't make anything here at level ${level}. The first method unlocks at level ${opensAt}.`}
                 </dd>
             </div>
         {/if}
@@ -136,7 +136,7 @@
 
 <GuideSection
     title="Every {skill.title} method"
-    blurb="What you can use now, cheapest XP first, then the rest in the order they unlock. Live Grand Exchange prices, buying the materials and selling what you make. It doesn't count boosts, outfits or how fast each one is."
+    blurb="Methods you can use at your level come first, sorted by cheapest XP, then the rest in the order they unlock. Costs use live Grand Exchange prices for buying the materials and selling what you make. Boosts, outfits and how fast each method is aren't counted."
 >
     {#snippet actions()}
         <div class="flex items-center gap-2">
@@ -152,7 +152,7 @@
     <GuideTable
         rowCount={rows.length}
         empty={data.methods.length
-            ? `Nothing can be made at level ${level} yet.`
+            ? `You can't make any of these at level ${level} yet. Turn off the switch above to see them all.`
             : `No ${skill.title} methods have prices right now. Check back after the next hourly update.`}
         caption="Every way to train {skill.title} by making things, with how many you'd need and the cost"
     >
@@ -202,7 +202,7 @@
 </GuideSection>
 
 <p class="text-sm text-muted-foreground">
-    Want the short version? See the
+    For the short version, see the guide to the
     <a href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: skill.slug })} class="underline hover:text-primary"
         >cheapest {skill.title} XP at every level</a
     >.
