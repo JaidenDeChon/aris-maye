@@ -39,7 +39,7 @@
         <li>
             <a href={resolve('/calculators/ge-tax')} class="{cardClass} flex-col items-start gap-1">
                 <span class="font-semibold">GE tax calculator</span>
-                <span class="text-sm text-muted-foreground">The tax on a sale, and what you keep after it.</span>
+                <span class="text-sm text-muted-foreground">Calculate profits after GE tax.</span>
             </a>
         </li>
     </ul>

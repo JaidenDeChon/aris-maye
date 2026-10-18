@@ -53,10 +53,7 @@
 
 <SeoHead seo={geTaxCalculatorSeo} />
 
-<GuideHeader
-    title="GE tax calculator"
-    answer="How much tax the Grand Exchange takes when you sell, and how much you keep."
-/>
+<GuideHeader title="GE tax calculator" answer="Calculate profits after GE tax." />
 
 <section class="flex min-w-0 flex-col gap-4 rounded-md border bg-muted/20 p-4" aria-label="Your sale">
     <div class="grid gap-4 sm:grid-cols-3">
@@ -141,7 +138,7 @@
 <GuideSection title="How GE tax works">
     <ul class="flex max-w-prose list-disc flex-col gap-1 pl-5 text-sm">
         <li>The seller pays {percent} of the sale price, rounded down, on each item.</li>
-        <li>Anything that sells for under 50 gp is tax-free, because the rounding takes it to 0.</li>
+        <li>Anything that sells for under 50 gp is tax-free.</li>
         <li>The tax on one item never goes over {gp(GE_TAX_CAP)}.</li>
         <li>Old School bonds are tax-free.</li>
     </ul>
