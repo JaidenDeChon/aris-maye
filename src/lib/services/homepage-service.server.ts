@@ -56,7 +56,7 @@ const SNAPSHOT_VERSION = 5;
 const MEMORY_CACHE_MS = 60 * 1000;
 
 /** The fields a homepage tile reads, kept small because a snapshot holds a few dozen of them. */
-const ITEM_PROJECTION = {
+export const ITEM_PROJECTION = {
     _id: 0,
     id: 1,
     name: 1,
@@ -76,7 +76,7 @@ const ITEM_PROJECTION = {
     typicalPrice24h: 1,
 } as const;
 
-type RawItem = {
+export type RawItem = {
     id: number;
     name: string;
     icon: string;
@@ -95,7 +95,7 @@ type RawItem = {
     typicalPrice24h?: number | null;
 };
 
-function toHomepageItem(raw: RawItem): HomepageItem {
+export function toHomepageItem(raw: RawItem): HomepageItem {
     const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
     return {
         id: raw.id,
@@ -118,7 +118,7 @@ function toHomepageItem(raw: RawItem): HomepageItem {
 }
 
 /** The match every homepage query starts from: craftable items the reader can put a value on. */
-function baseCreationMatch(ironman: boolean): Record<string, unknown> {
+export function baseCreationMatch(ironman: boolean): Record<string, unknown> {
     return {
         'creationSpecs.0': { $exists: true },
         placeholder: false,
@@ -133,7 +133,11 @@ function baseCreationMatch(ironman: boolean): Record<string, unknown> {
  *
  * The pipeline is the expensive part, so it runs once and `$facet` cuts the result into lists.
  */
-async function computeCreationSections(ironman: boolean, natureRunePrice: number) {
+export async function computeCreationSections(
+    ironman: boolean,
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+) {
     const itemProjection = { $project: ITEM_PROJECTION };
     const rawItem = (path: string) =>
         Object.fromEntries(
@@ -170,17 +174,17 @@ async function computeCreationSections(ironman: boolean, natureRunePrice: number
         },
         {
             $facet: {
-                topProfit: [{ $sort: { creationProfit: -1, name: 1 } }, { $limit: HOMEPAGE_LIST_SIZE }, itemProjection],
+                topProfit: [{ $sort: { creationProfit: -1, name: 1 } }, { $limit: limit }, itemProjection],
                 topRoi: [
                     { $match: { creationProfit: { $gte: HOMEPAGE_MIN_ROI_PROFIT }, creationRoi: { $ne: null } } },
                     { $sort: { creationRoi: -1, name: 1 } },
-                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $limit: limit },
                     itemProjection,
                 ],
                 topGpPerLimit: [
                     { $match: { gpPerLimit: { $gt: 0 } } },
                     { $sort: { gpPerLimit: -1, name: 1 } },
-                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $limit: limit },
                     itemProjection,
                 ],
                 skillEarners: [
@@ -261,7 +265,10 @@ async function computeCreationSections(ironman: boolean, natureRunePrice: number
  *
  * The buy price is the instant-buy price (`highPrice`), since that's what it costs to get one now.
  */
-async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPick[]> {
+export async function computeAlchPicks(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageAlchPick[]> {
     const oldestPrice = Math.floor(Date.now() / 1000) - HOMEPAGE_ALCH_MAX_PRICE_AGE_S;
     const rows = await OsrsboxItemModel.aggregate<RawItem & { highalch: number; alchProfit: number }>([
         {
@@ -279,7 +286,7 @@ async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPi
         { $set: { alchProfit: { $subtract: [{ $subtract: ['$highalch', '$highPrice'] }, natureRunePrice] } } },
         { $match: { alchProfit: { $gt: 0 } } },
         { $sort: { alchProfit: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         { $project: { ...ITEM_PROJECTION, highalch: 1, alchProfit: 1 } },
     ]);
 
@@ -291,21 +298,29 @@ async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPi
     }));
 }
 
+/** Items that trade on the GE, without their noted, placeholder or stacked copies. */
+export const TRADEABLE_MATCH = { tradeable_on_ge: true, placeholder: false, noted: false, stacked: null } as const;
+
+/**
+ * The movers floor: enough gold and enough trades a day for a price change to mean something.
+ * See "Movers floor" in `docs/homepage-plan.md`.
+ */
+export const LIQUID_MATCH = {
+    priceChange24h: { $ne: null },
+    volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
+    tradedHours24h: { $gte: MOVERS_MIN_TRADED_HOURS },
+    $expr: {
+        $gte: [{ $multiply: ['$volume24h', { $ifNull: ['$typicalPrice24h', 0] }] }, MOVERS_MIN_GP_PER_DAY],
+    },
+};
+
 /**
  * What's trading on the GE: the most traded items this hour, and the biggest risers and fallers
  * over the last day among items that trade enough for their price to mean something.
  */
 async function computeMarketPulse(): Promise<HomepageMarketPulse> {
-    const tradeable = { tradeable_on_ge: true, placeholder: false, noted: false, stacked: null };
-    // The movers floor: enough gold and enough trades a day. See "Movers floor" in the plan doc.
-    const liquid = {
-        priceChange24h: { $ne: null },
-        volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
-        tradedHours24h: { $gte: MOVERS_MIN_TRADED_HOURS },
-        $expr: {
-            $gte: [{ $multiply: ['$volume24h', { $ifNull: ['$typicalPrice24h', 0] }] }, MOVERS_MIN_GP_PER_DAY],
-        },
-    };
+    const tradeable = TRADEABLE_MATCH;
+    const liquid = LIQUID_MATCH;
 
     const [facets] = await OsrsboxItemModel.aggregate<{
         historyHours: { hours: number }[];
@@ -360,7 +375,10 @@ function alchAfterRuneExpr(natureRunePrice: number) {
  *
  * Only shops that pay in coins count; a Tokkul price isn't gp.
  */
-async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSale[]> {
+export async function computeShopSales(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageShopSale[]> {
     const rows = await OsrsboxItemModel.aggregate<
         RawItem & {
             shop: string;
@@ -381,7 +399,7 @@ async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSa
         { $group: { _id: '$id', doc: { $first: '$$ROOT' } } },
         { $replaceRoot: { newRoot: '$doc' } },
         { $sort: { gain: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         {
             $project: {
                 ...ITEM_PROJECTION,
@@ -411,7 +429,10 @@ async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSa
  * Any ingredient no shop sells rules the creation out. Only shops that also buy from players are in
  * the scraped data, so this can miss a few sell-only shops.
  */
-async function computeShopSupplied(natureRunePrice: number): Promise<HomepageItem[]> {
+export async function computeShopSupplied(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageItem[]> {
     const rows = await OsrsboxItemModel.aggregate<RawItem>([
         { $match: { 'creationSpecs.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
         { $set: { primarySpec: buildPrimarySpecExpression() } },
@@ -540,7 +561,7 @@ async function computeShopSupplied(natureRunePrice: number): Promise<HomepageIte
             },
         },
         { $sort: { creationProfit: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         { $project: ITEM_PROJECTION },
     ] as unknown as PipelineStage[]).allowDiskUse(true);
 

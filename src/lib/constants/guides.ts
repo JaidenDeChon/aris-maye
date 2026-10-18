@@ -12,15 +12,15 @@ export const GUIDE_SNAPSHOT_COLLECTION = 'guide-snapshots';
 
 /**
  * The skills with a cheapest-XP page. A fixed list rather than one worked out from the data, so the
- * sitemap can't change from hour to hour. Each has at least 13 creations that grant XP; the
- * gathering skills have six or fewer, too few for a page.
+ * sitemap can't change from hour to hour. Each has methods in at least three level bands when
+ * valued from GE prices (`scripts/verify-guides.ts` checks). Farming (three tradeable composts) and
+ * Firemaking (pyre logs, with no Firemaking level in the data) are too thin for a page, and the
+ * gathering skills have almost no creations at all.
  */
 export const XP_GUIDE_SKILLS = [
     { slug: 'construction', title: 'Construction' },
     { slug: 'cooking', title: 'Cooking' },
     { slug: 'crafting', title: 'Crafting' },
-    { slug: 'farming', title: 'Farming' },
-    { slug: 'firemaking', title: 'Firemaking' },
     { slug: 'fletching', title: 'Fletching' },
     { slug: 'herblore', title: 'Herblore' },
     { slug: 'magic', title: 'Magic' },
