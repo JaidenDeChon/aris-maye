@@ -69,7 +69,7 @@
             makes a profit costs nothing per XP: it's marked "Pays", with what it earns per XP in green. In each level range
             the cheapest come first, and among the free ones, the most XP each.
         </p>
-        <p>This is the cost of XP, not the speed. A cheap method can still be slow if each action takes a while.</p>
+        <p>This ranks by cost alone. A cheap method can still be slow if each action takes a while.</p>
         {#if moneyMakers}
             <p>
                 Want gold rather than XP? See the
@@ -82,7 +82,7 @@
     </div>
 </GuideSection>
 
-<GuideSection title="Other skills">
+<GuideSection title="Cheapest XP in other skills">
     <ul class="flex flex-wrap gap-2">
         {#each otherSkills as other (other.slug)}
             <li>
