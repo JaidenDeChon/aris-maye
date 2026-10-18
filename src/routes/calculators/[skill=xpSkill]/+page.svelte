@@ -88,6 +88,7 @@
     title="{skill.title} calculator"
     answer="How many of each item you'd need to make to reach your {skill.title} goal, and what it costs at today's Grand Exchange prices."
     computedAt={data.computedAt}
+    refreshedHourly={false}
 />
 
 <section class="flex min-w-0 flex-col gap-4 rounded-md border bg-muted/20 p-4" aria-label="Your goal">
@@ -136,7 +137,10 @@
 
 <GuideSection
     title="Every {skill.title} method"
-    blurb="Methods you can use at your level come first, sorted by cheapest XP, then the rest in the order they unlock. Costs use live Grand Exchange prices for buying the materials and selling what you make. Boosts, outfits and how fast each method is aren't counted."
+    blurb={[
+        'Methods you can use at your level come first, sorted by cheapest XP, then the rest in the order they unlock.',
+        'Costs use live Grand Exchange prices for buying the materials and selling what you make.',
+    ]}
 >
     {#snippet actions()}
         <div class="flex items-center gap-2">

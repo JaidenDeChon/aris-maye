@@ -102,13 +102,45 @@
     }
 }
 
+/*
+ * The width of the page's content column, shared by `content-sizing` and the header row so the two
+ * always line up. Change them here and both follow.
+ */
+:root {
+    --content-max-width: 64rem;
+    --content-gutter: 2rem;
+}
+
 @layer utilities {
     /*
-     * Helps size content appropriately. Handles content width and padding. Use on outer parents.
+     * The page's content column: centred, at most `--content-max-width` wide including its
+     * `--content-gutter` padding. Every page's content sits in one of these so its edges line up with
+     * the header's logo and Ironman toggle. Pages put it on their outer wrapper, or a section
+     * layout puts it around `children`.
      */
     .content-sizing {
-        width: 100%;
-        @apply mx-auto w-full max-w-5xl px-8;
+        @apply mx-auto w-full min-w-0;
+        max-width: var(--content-max-width);
+        padding-inline: var(--content-gutter);
+    }
+
+    /*
+     * A full-width row whose contents line up with `content-sizing` below it. The header uses it.
+     * From `md` the left side never drops below 5.5rem, which keeps the contents clear of the
+     * sidebar button pinned at the far left.
+     */
+    .content-aligned-row {
+        padding-inline: var(--content-gutter);
+    }
+
+    @media (min-width: theme('screens.md')) {
+        .content-aligned-row {
+            padding-left: max(5.5rem, calc((100% - var(--content-max-width)) / 2 + var(--content-gutter)));
+            padding-right: max(
+                var(--content-gutter),
+                calc((100% - var(--content-max-width)) / 2 + var(--content-gutter))
+            );
+        }
     }
 
     /*

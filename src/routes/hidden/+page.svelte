@@ -29,26 +29,22 @@
 
 <SeoHead seo={hiddenSeo} />
 
-<div class="px-4 sm:px-6 lg:px-8">
-    <div class="max-w-5xl mx-auto w-full">
-        <h1 class="text-3xl font-bold mb-4">Hidden items</h1>
+<div>
+    <h1 class="text-3xl font-bold mb-4">Hidden items</h1>
 
-        {#if loading}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {#each Array.from({ length: 5 }, (_, i) => i) as index (index)}
-                    <ItemCard {loading} />
-                {/each}
-            </div>
-        {:else if completeHidden.length === 0}
-            <div class="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-                No hidden items yet.
-            </div>
-        {:else}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {#each completeHidden as item (item.id)}
-                    <ItemCard {item} linkToItemPage allowHide={true} allowFavorite={false} />
-                {/each}
-            </div>
-        {/if}
-    </div>
+    {#if loading}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {#each Array.from({ length: 5 }, (_, i) => i) as index (index)}
+                <ItemCard {loading} />
+            {/each}
+        </div>
+    {:else if completeHidden.length === 0}
+        <div class="rounded-lg border border-dashed p-8 text-center text-muted-foreground">No hidden items yet.</div>
+    {:else}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {#each completeHidden as item (item.id)}
+                <ItemCard {item} linkToItemPage allowHide={true} allowFavorite={false} />
+            {/each}
+        </div>
+    {/if}
 </div>

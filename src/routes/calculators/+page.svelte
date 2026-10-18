@@ -15,7 +15,7 @@
 
 <GuideHeader
     title="OSRS calculators"
-    answer="Work out what a skill goal costs, or what you keep after GE tax, from live Grand Exchange prices."
+    answer="Calculators for skill goals and GE profits. Powered by hourly price updates."
 />
 
 <GuideSection
