@@ -7,6 +7,10 @@
         "humanized_at": "2026-10-18T03:14:27Z",
         "sha256": "c59aff782e2dc1a4ae57d08fd2ef705c040a9dc48ba4174fe755b50cd3260b2c"
     },
+    "src/lib/seo/market-share-card.ts": {
+        "humanized_at": "2026-10-18T03:14:33Z",
+        "sha256": "ad5ca4810b270e36ded3e8eab132bbae27f63eece207b36b3ac9299f77cb750e"
+    },
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
