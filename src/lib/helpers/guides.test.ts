@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 import type { HomepageAlchPick, HomepageItem } from '$lib/models/homepage';
 import type { CheapestXpGuide, XpMethod } from '$lib/models/guides';
-import { alchPerLimit, cheapestPerSkill, levelBand, median, sortAlchPicks, summarizeChanges } from './guides';
+import {
+    alchPerLimit,
+    cheapestPerSkill,
+    levelBand,
+    median,
+    netCostPerXp,
+    sortAlchPicks,
+    summarizeChanges,
+} from './guides';
 
 function item(id: number, name: string, extra: Partial<HomepageItem> = {}): HomepageItem {
     return {
@@ -44,7 +52,7 @@ describe('levelBand', () => {
         [99, 80],
         [120, 80],
     ])('puts level %p in the band starting at %p', (level, min) => {
-        expect(levelBand(level).min).toBe(min);
+        expect(levelBand(level).min as number).toBe(min);
     });
 });
 
@@ -89,10 +97,30 @@ describe('alchPerLimit', () => {
 
 describe('cheapestPerSkill', () => {
     const method = (id: number, gpPerXp: number, xp: number, level = 1): XpMethod => ({
-        item: item(id, `Item ${id}`),
+        item: item(id, `Item ${id}`, { creationProfit: -gpPerXp * xp }),
         level,
         xp,
         gpPerXp,
+    });
+
+    it('counts every paying method as free and prefers more XP, however much one pays', () => {
+        const pays = (id: number, profit: number, xp: number): XpMethod => ({
+            item: item(id, `Item ${id}`, { creationProfit: profit }),
+            level: 1,
+            xp,
+            gpPerXp: 0,
+        });
+        const guide: CheapestXpGuide = {
+            computedAt: 0,
+            skills: [
+                {
+                    skill: 'smithing',
+                    bands: [{ min: 1, max: 19, rows: [pays(1, 1_500_000_000, 5), pays(2, 500, 59)] }],
+                },
+            ],
+        };
+        expect(cheapestPerSkill(guide)[0].method.item.id).toBe(2);
+        expect(netCostPerXp(pays(2, 4500, 14))).toBeCloseTo(-321.43, 2);
     });
 
     it('takes the lowest GP per XP across bands, preferring more XP on a tie', () => {

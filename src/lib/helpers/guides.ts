@@ -38,13 +38,28 @@ export function sortAlchPicks(picks: HomepageAlchPick[], sort: AlchSort): Homepa
     return [...picks].sort((a, b) => score(b) - score(a) || a.item.name.localeCompare(b.item.name));
 }
 
+/**
+ * What each XP really costs: positive when making the item loses money, negative when it pays.
+ * `gpPerXp` stops at zero, so it can't tell a method that pays 1 gp apart from one that pays 300.
+ */
+export function netCostPerXp(method: Pick<XpMethod, 'item' | 'xp'>): number {
+    return -(method.item.creationProfit ?? 0) / method.xp;
+}
+
+/**
+ * Cheapest XP first. Every method that pays counts as free, and among those the most XP each wins,
+ * the same rule as the homepage. Ranking by what a method pays instead would turn a training list
+ * into a money-making one, led by things like a 3rd age axe that pays a fortune for 5 XP.
+ */
+export function compareXpMethods(a: XpMethod, b: XpMethod): number {
+    return a.gpPerXp - b.gpPerXp || b.xp - a.xp || a.item.name.localeCompare(b.item.name);
+}
+
 /** Each skill's single cheapest method across its level bands, for the cheapest-XP overview. */
 export function cheapestPerSkill(guide: CheapestXpGuide): { skill: string; method: XpMethod }[] {
     const result: { skill: string; method: XpMethod }[] = [];
     for (const { skill, bands } of guide.skills) {
-        const best = bands
-            .flatMap((band) => band.rows)
-            .sort((a, b) => a.gpPerXp - b.gpPerXp || b.xp - a.xp || a.item.name.localeCompare(b.item.name))[0];
+        const best = bands.flatMap((band) => band.rows).sort(compareXpMethods)[0];
         if (best) result.push({ skill, method: best });
     }
     return result;

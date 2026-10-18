@@ -1,4 +1,5 @@
 import { type PipelineStage } from 'mongoose';
+import { error } from '@sveltejs/kit';
 import { OsrsboxItemModel } from '$lib/models/mongo-schemas/osrsbox-db-item-schema';
 import {
     buildPrimarySpecExpression,
@@ -30,7 +31,7 @@ import {
 import { HOMEPAGE_SNAPSHOT_MAX_AGE_MS } from '$lib/constants/homepage';
 import { VOLUME_HISTORY_HOURS } from '$lib/constants/market';
 import { canonicalSkill } from '$lib/constants/skill-aliases';
-import { levelBand, summarizeChanges } from '$lib/helpers/guides';
+import { compareXpMethods, levelBand, summarizeChanges } from '$lib/helpers/guides';
 import type {
     CheapestXpGuide,
     HighAlchGuide,
@@ -156,9 +157,7 @@ export function bucketXpRows(rows: RawXpRow[]): CheapestXpGuide['skills'] {
         bands: XP_LEVEL_BANDS.map(({ min, max }) => ({
             min,
             max,
-            rows: (buckets.get(`${slug}:${min}`) ?? [])
-                .sort((a, b) => a.gpPerXp - b.gpPerXp || b.xp - a.xp || a.item.name.localeCompare(b.item.name))
-                .slice(0, GUIDE_ROWS.xpPerBand),
+            rows: (buckets.get(`${slug}:${min}`) ?? []).sort(compareXpMethods).slice(0, GUIDE_ROWS.xpPerBand),
         })),
     }));
 }
@@ -275,4 +274,21 @@ export async function getGuideStatus(): Promise<
     const keys = Object.keys(builders) as GuideKey[];
     const statuses = await Promise.all(keys.map((key) => guideCache(key).status()));
     return Object.fromEntries(keys.map((key, i) => [`${key}-v${GUIDE_SNAPSHOT_VERSION}`, statuses[i]]));
+}
+
+/**
+ * A guide page's server load: its snapshot, or a 503 when there's none to show. A guide never
+ * renders as a 200 with empty tables, which would tell search engines the page is thin.
+ */
+export async function loadGuide<K extends GuideKey>(
+    key: K,
+    setHeaders: (headers: Record<string, string>) => void,
+): Promise<GuideSnapshots[K]> {
+    try {
+        return await getGuideSnapshot(key);
+    } catch (cause) {
+        console.error(`Failed to load the ${key} guide:`, cause);
+        setHeaders({ 'retry-after': '600' });
+        error(503, 'This guide is being rebuilt. Try again in a few minutes.');
+    }
 }

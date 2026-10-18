@@ -54,7 +54,9 @@ export type GuideKey = 'market' | 'high-alch' | 'cheapest-xp' | 'ironman';
 
 export const GUIDE_KEYS: GuideKey[] = ['market', 'high-alch', 'cheapest-xp', 'ironman'];
 
-export type GuidePage = { key: GuideKey; path: string; title: string; blurb: string };
+export type GuidePath = '/guides/market' | '/guides/high-alch' | '/guides/cheapest-xp' | '/guides/ironman-money-making';
+
+export type GuidePage = { key: GuideKey; path: GuidePath; title: string; blurb: string };
 
 /** The guides, for the hub, the sidebar and "Related guides". */
 export const GUIDE_PAGES: GuidePage[] = [
