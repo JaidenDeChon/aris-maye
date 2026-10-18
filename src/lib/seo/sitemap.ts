@@ -29,6 +29,9 @@ export function sitemapUrls(itemIds: number[], base: string = SITE_URL): string[
         '/guides',
         ...GUIDE_PAGES.map((guide) => guide.path),
         ...XP_GUIDE_SKILLS.map((skill) => `/guides/cheapest-xp/${skill.slug}`),
+        '/calculators',
+        ...XP_GUIDE_SKILLS.map((skill) => `/calculators/${skill.slug}`),
+        '/calculators/ge-tax',
     ];
     for (const id of itemIds) paths.push(`/items/${id}`);
     return [...new Set(paths.map((path) => canonicalUrl(path, base)))];
