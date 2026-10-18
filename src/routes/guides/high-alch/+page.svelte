@@ -51,7 +51,7 @@
 
     <GuideTable
         rowCount={picks.length}
-        empty="Nothing turns a profit to alch at today's prices."
+        empty="No item is profitable to alch at today's prices."
         caption="Most profitable items to high alch"
     >
         {#snippet head()}
