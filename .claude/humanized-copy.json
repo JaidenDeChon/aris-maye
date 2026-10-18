@@ -2,5 +2,9 @@
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
+    },
+    "src/routes/guides/market/+page.svelte": {
+        "humanized_at": "2026-10-18T03:12:58Z",
+        "sha256": "9e4b2700664442fb4b8bed3eb390d322d50c50d7b4240c87e146e65f32b7a26d"
     }
 }

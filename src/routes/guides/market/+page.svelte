@@ -107,7 +107,7 @@
         hint="Busy items down on the day"
     />
     <StatTile
-        label="Middle change"
+        label="Median change"
         value={formatChange(summary.medianChange)}
         tone={(summary.medianChange ?? 0) > 0 ? 'positive' : (summary.medianChange ?? 0) < 0 ? 'negative' : 'neutral'}
         hint="Half of busy items moved more"
