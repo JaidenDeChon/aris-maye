@@ -17,6 +17,8 @@
         "verify-used-in-index": "bun run --env-file .env scripts/verify-used-in-index.ts",
         "verify-seo": "bun scripts/verify-seo.ts",
         "verify-share-links": "bun scripts/verify-share-links.ts",
+        "verify-guides": "bun run --env-file .env scripts/verify-guides.ts",
+        "verify-guide-pages": "bun scripts/verify-guide-pages.ts",
         "update-item-prices": "bun run --env-file .env scripts/run-update-item-prices.ts",
         "remove-duplicate-items": "bun run --env-file .env scripts/remove-duplicate-items.ts",
         "normalize-wiki-names": "bun run --env-file .env scripts/normalize-wiki-names.ts",
