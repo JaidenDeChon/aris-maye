@@ -16,12 +16,10 @@
 
 <SeoHead {seo} />
 
-<div class="px-4 sm:px-6 lg:px-8 py-16">
-    <div class="max-w-5xl mx-auto w-full text-center">
-        <h1 class="text-3xl font-bold mb-2">{page.status}</h1>
-        <p class="text-muted-foreground mb-6">
-            {page.status === 404 ? "We couldn't find that page." : (page.error?.message ?? 'Something went wrong.')}
-        </p>
-        <a href={resolve('/items')} class="text-primary underline underline-offset-4">Browse items</a>
-    </div>
+<div class="content-sizing py-16 text-center">
+    <h1 class="text-3xl font-bold mb-2">{page.status}</h1>
+    <p class="text-muted-foreground mb-6">
+        {page.status === 404 ? "We couldn't find that page." : (page.error?.message ?? 'Something went wrong.')}
+    </p>
+    <a href={resolve('/items')} class="text-primary underline underline-offset-4">Browse items</a>
 </div>

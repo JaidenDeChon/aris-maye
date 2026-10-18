@@ -8,9 +8,17 @@
         computedAt?: number;
         /** Where the numbers come from, for the line beside the update time. */
         source?: string;
+        /** Whether the update line says the numbers refresh hourly. */
+        refreshedHourly?: boolean;
     }
 
-    const { title, answer, computedAt, source = 'From Grand Exchange prices.' }: GuideHeaderProps = $props();
+    const {
+        title,
+        answer,
+        computedAt,
+        source = 'From Grand Exchange prices.',
+        refreshedHourly = true,
+    }: GuideHeaderProps = $props();
 </script>
 
 <header class="flex flex-col gap-2">
@@ -18,7 +26,7 @@
     <p class="max-w-prose text-base text-muted-foreground">{answer}</p>
     {#if computedAt}
         <p class="text-xs text-muted-foreground">
-            {source} Updated <UpdatedTime {computedAt} />, refreshed hourly.
+            {source} Updated <UpdatedTime {computedAt} />{refreshedHourly ? ', refreshed hourly.' : '.'}
         </p>
     {/if}
 </header>

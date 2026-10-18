@@ -13,11 +13,14 @@
         Sparkles,
         GraduationCap,
         Shield,
+        Calculator,
+        Receipt,
     } from 'lucide-svelte';
     import { favoritesStore } from '$lib/stores/favorites-store';
     import { hiddenStore } from '$lib/stores/hidden-store';
     import { resolve } from '$app/paths';
-    import type { GuidePath } from '$lib/constants/guides';
+    import { XP_GUIDE_SKILLS, type GuidePath } from '$lib/constants/guides';
+    import { skillIcon } from '$lib/helpers/homepage';
 
     interface Item {
         title: string;
@@ -71,6 +74,23 @@
         { title: 'High alch', url: '/guides/high-alch', icon: Sparkles },
         { title: 'Cheapest XP', url: '/guides/cheapest-xp', icon: GraduationCap },
         { title: 'Ironman money', url: '/guides/ironman-money-making', icon: Shield },
+    ];
+
+    // "All calculators" is lit only on the hub itself.
+    const calculators: {
+        title: string;
+        href: string;
+        icon?: typeof Calculator;
+        iconString?: string;
+        exact?: boolean;
+    }[] = [
+        { title: 'All calculators', href: resolve('/calculators'), icon: Calculator, exact: true },
+        { title: 'GE tax', href: resolve('/calculators/ge-tax'), icon: Receipt },
+        ...XP_GUIDE_SKILLS.map((skill) => ({
+            title: skill.title,
+            href: resolve('/calculators/[skill=xpSkill]', { skill: skill.slug }),
+            iconString: skillIcon(skill.slug),
+        })),
     ];
 
     const currentPath = $derived(page.url.pathname || '');
@@ -168,6 +188,38 @@
                                 <guide.icon />
                                 <span>{guide.title}</span>
                                 {#if currentPath === guide.url || (!guide.exact && currentPath.startsWith(`${guide.url}/`))}
+                                    {@render activeRouteIndicator()}
+                                {/if}
+                            </a>
+                        {/snippet}
+                    </Sidebar.MenuButton>
+                </Sidebar.MenuItem>
+            {/each}
+        </Sidebar.Menu>
+    </Sidebar.GroupContent>
+</Sidebar.Group>
+
+<Sidebar.Group>
+    <Sidebar.GroupLabel>Calculators</Sidebar.GroupLabel>
+    <Sidebar.GroupContent>
+        <Sidebar.Menu>
+            {#each calculators as calculator (calculator.href)}
+                <Sidebar.MenuItem>
+                    <Sidebar.MenuButton>
+                        {#snippet tooltipContent()}
+                            {calculator.title} calculator
+                        {/snippet}
+                        {#snippet child({ props })}
+                            <!-- Already resolved above. -->
+                            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                            <a href={calculator.href} {...props}>
+                                {#if calculator.icon}
+                                    <calculator.icon />
+                                {:else if calculator.iconString}
+                                    <img src={calculator.iconString} alt="" class="w-4 h-4" />
+                                {/if}
+                                <span>{calculator.title}</span>
+                                {#if currentPath === calculator.href || (!calculator.exact && currentPath.startsWith(`${calculator.href}/`))}
                                     {@render activeRouteIndicator()}
                                 {/if}
                             </a>

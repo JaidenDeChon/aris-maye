@@ -42,6 +42,17 @@ describe('sitemapUrls', () => {
         expect(guides).toHaveLength(13);
         for (const path of guides) expect(urls.filter((u) => u === `${BASE}${path}`)).toHaveLength(1);
     });
+
+    it('lists the calculators hub, every skill calculator and the GE tax calculator once', () => {
+        const urls = sitemapUrls([], BASE);
+        const calculators = [
+            '/calculators',
+            ...XP_GUIDE_SKILLS.map((skill) => `/calculators/${skill.slug}`),
+            '/calculators/ge-tax',
+        ];
+        expect(calculators).toHaveLength(10);
+        for (const path of calculators) expect(urls.filter((u) => u === `${BASE}${path}`)).toHaveLength(1);
+    });
 });
 
 describe('buildSitemap', () => {

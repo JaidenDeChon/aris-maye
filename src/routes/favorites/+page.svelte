@@ -29,26 +29,24 @@
 
 <SeoHead seo={favoritesSeo} />
 
-<div class="px-4 sm:px-6 lg:px-8">
-    <div class="max-w-5xl mx-auto w-full">
-        <h1 class="text-3xl font-bold mb-4">Favorites</h1>
+<div>
+    <h1 class="text-3xl font-bold mb-4">Favorites</h1>
 
-        {#if loading}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {#each Array.from({ length: 5 }, (_, i) => i) as index (index)}
-                    <ItemCard {loading} />
-                {/each}
-            </div>
-        {:else if completeFavorites.length === 0}
-            <div class="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-                No favorites yet. Add items to your favorites to see them here.
-            </div>
-        {:else}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {#each completeFavorites as item (item.id)}
-                    <ItemCard {item} linkToItemPage allowHide={false} allowFavorite={true} />
-                {/each}
-            </div>
-        {/if}
-    </div>
+    {#if loading}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {#each Array.from({ length: 5 }, (_, i) => i) as index (index)}
+                <ItemCard {loading} />
+            {/each}
+        </div>
+    {:else if completeFavorites.length === 0}
+        <div class="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+            No favorites yet. Add items to your favorites to see them here.
+        </div>
+    {:else}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {#each completeFavorites as item (item.id)}
+                <ItemCard {item} linkToItemPage allowHide={false} allowFavorite={true} />
+            {/each}
+        </div>
+    {/if}
 </div>

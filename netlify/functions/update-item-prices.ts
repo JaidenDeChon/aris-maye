@@ -41,10 +41,10 @@ function extraPriceDatabases(): string[] {
 }
 
 /**
- * What the site keeps cached from prices: the homepage sections and each guide page. Written out
+ * What the site keeps cached from prices: the homepage sections, each guide page and the calculators. Written out
  * here rather than imported, because this function's bundler can't resolve `$lib`.
  */
-const REFRESH_TARGETS = ['homepage', 'market', 'high-alch', 'cheapest-xp', 'ironman'];
+const REFRESH_TARGETS = ['homepage', 'market', 'high-alch', 'cheapest-xp', 'ironman', 'calculators'];
 
 /**
  * Asks the site to rebuild its cached homepage sections and guides from the new prices, so visitors
