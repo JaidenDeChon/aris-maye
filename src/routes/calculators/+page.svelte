@@ -20,7 +20,7 @@
 
 <GuideSection
     title="Skill calculators"
-    blurb="Enter your level and your goal to see how many of each thing to make, and what it costs."
+    blurb="Enter your level and your goal to see how many of each item to make, and what it costs."
 >
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {#each XP_GUIDE_SKILLS as skill (skill.slug)}
