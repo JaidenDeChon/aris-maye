@@ -10,7 +10,7 @@ export const handler: Handler = async () => {
         console.info('MongoDB connection established. Updating all game item prices...');
         await updateAllGameItemPricesInMongo(extraPriceDatabases());
         console.info('All game item prices updated.');
-        await refreshHomepageSnapshots();
+        await refreshSnapshots();
 
         return {
             statusCode: 200,
@@ -41,29 +41,40 @@ function extraPriceDatabases(): string[] {
 }
 
 /**
- * Asks the site to rebuild its homepage sections from the new prices, so visitors don't wait for it.
- *
- * This goes through the site rather than importing the homepage service, because that service uses
- * SvelteKit's `$lib` imports, which this function's bundler can't resolve. It needs
- * `HOMEPAGE_REFRESH_TOKEN` set on the site. Without it, or if the call fails, the homepage still
- * rebuilds a stale snapshot itself on the next visit.
+ * What the site keeps cached from prices: the homepage sections and each guide page. Written out
+ * here rather than imported, because this function's bundler can't resolve `$lib`.
  */
-async function refreshHomepageSnapshots(): Promise<void> {
+const REFRESH_TARGETS = ['homepage', 'market', 'high-alch', 'cheapest-xp', 'ironman'];
+
+/**
+ * Asks the site to rebuild its cached homepage sections and guides from the new prices, so visitors
+ * don't wait for it.
+ *
+ * This goes through the site rather than importing the services, because they use SvelteKit's
+ * `$lib` imports, which this function's bundler can't resolve. Each target is its own request,
+ * all sent at once: each rebuild runs in its own function invocation with its own time limit, and
+ * this run only waits as long as the slowest one. It needs `HOMEPAGE_REFRESH_TOKEN` set on the
+ * site. Without it, or if a call fails, that page still rebuilds a stale snapshot itself on the
+ * next visit.
+ */
+async function refreshSnapshots(): Promise<void> {
     const token = process.env.HOMEPAGE_REFRESH_TOKEN;
     const siteUrl = process.env.URL;
     if (!token || !siteUrl) {
-        console.info('Skipping homepage refresh: HOMEPAGE_REFRESH_TOKEN or URL is not set.');
+        console.info('Skipping snapshot refresh: HOMEPAGE_REFRESH_TOKEN or URL is not set.');
         return;
     }
 
-    try {
-        const response = await fetch(new URL('/api/homepage/refresh', siteUrl), {
-            method: 'POST',
-            headers: { 'x-refresh-token': token },
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        console.info('Homepage snapshots refreshed.');
-    } catch (error) {
-        console.error('Error refreshing homepage snapshots:', error);
-    }
+    const results = await Promise.allSettled(
+        REFRESH_TARGETS.map(async (target) => {
+            const url = new URL('/api/homepage/refresh', siteUrl);
+            url.searchParams.set('target', target);
+            const response = await fetch(url, { method: 'POST', headers: { 'x-refresh-token': token } });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        }),
+    );
+    results.forEach((result, i) => {
+        if (result.status === 'fulfilled') console.info(`Refreshed ${REFRESH_TARGETS[i]}.`);
+        else console.error(`Error refreshing ${REFRESH_TARGETS[i]}:`, result.reason);
+    });
 }

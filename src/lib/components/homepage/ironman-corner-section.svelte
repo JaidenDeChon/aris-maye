@@ -42,7 +42,13 @@
     </div>
 {/snippet}
 
-<HomeBand title="Ironman corner" blurb="Money-makers that don't touch the Grand Exchange" {compact} showSeeAll={false}>
+<HomeBand
+    title="Ironman corner"
+    blurb="Money-makers that don't touch the Grand Exchange"
+    {compact}
+    seeAllHref="/guides/ironman-money-making"
+    seeAllLabel="More Ironman money makers"
+>
     <div class="grid gap-6 lg:grid-cols-2">
         {#snippet salesBody()}
             {#each corner.shopSales as sale (sale.item.id)}

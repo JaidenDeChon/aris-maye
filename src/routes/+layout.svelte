@@ -40,7 +40,9 @@
 
 <Sidebar.Provider>
     <NavMenu showDevControls={data.showDevControls} />
-    <Sidebar.Inset>
+    <!-- min-w-0 lets the content column shrink to the screen. Without it, a wide table on a guide
+         page widens the whole column and the page scrolls sideways on a phone. -->
+    <Sidebar.Inset class="min-w-0">
         <main class="w-full">
             <SiteHeader />
             {@render children?.()}

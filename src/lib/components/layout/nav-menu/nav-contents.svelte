@@ -2,10 +2,22 @@
     import { page } from '$app/state';
     import * as Sidebar from '$lib/components/ui/sidebar';
     import { skillTreePages } from '$lib/constants/skill-tree-pages';
-    import { Home, Heart, Sword, EyeOff, User } from 'lucide-svelte';
+    import {
+        Home,
+        Heart,
+        Sword,
+        EyeOff,
+        User,
+        BookOpen,
+        TrendingUp,
+        Sparkles,
+        GraduationCap,
+        Shield,
+    } from 'lucide-svelte';
     import { favoritesStore } from '$lib/stores/favorites-store';
     import { hiddenStore } from '$lib/stores/hidden-store';
     import { resolve } from '$app/paths';
+    import type { GuidePath } from '$lib/constants/guides';
 
     interface Item {
         title: string;
@@ -51,6 +63,15 @@
         url: `/items/${skill.slug}`,
         iconString: skill.icon,
     }));
+
+    // "All guides" is lit only on the hub itself; the others also cover their sub-pages.
+    const guides: { title: string; url: '/guides' | GuidePath; icon: typeof BookOpen; exact?: boolean }[] = [
+        { title: 'All guides', url: '/guides', icon: BookOpen, exact: true },
+        { title: 'Market report', url: '/guides/market', icon: TrendingUp },
+        { title: 'High alch', url: '/guides/high-alch', icon: Sparkles },
+        { title: 'Cheapest XP', url: '/guides/cheapest-xp', icon: GraduationCap },
+        { title: 'Ironman money', url: '/guides/ironman-money-making', icon: Shield },
+    ];
 
     const currentPath = $derived(page.url.pathname || '');
     const favoritesCount = $derived(($favoritesStore.favorites || []).length);
@@ -121,6 +142,32 @@
                                 {/if}
                                 <span>{skill.title}</span>
                                 {#if currentPath === skill.url || currentPath.startsWith(`${skill.url}/`)}
+                                    {@render activeRouteIndicator()}
+                                {/if}
+                            </a>
+                        {/snippet}
+                    </Sidebar.MenuButton>
+                </Sidebar.MenuItem>
+            {/each}
+        </Sidebar.Menu>
+    </Sidebar.GroupContent>
+</Sidebar.Group>
+
+<Sidebar.Group>
+    <Sidebar.GroupLabel>Guides</Sidebar.GroupLabel>
+    <Sidebar.GroupContent>
+        <Sidebar.Menu>
+            {#each guides as guide (guide.url)}
+                <Sidebar.MenuItem>
+                    <Sidebar.MenuButton>
+                        {#snippet tooltipContent()}
+                            {guide.title}
+                        {/snippet}
+                        {#snippet child({ props })}
+                            <a href={resolve(guide.url)} {...props}>
+                                <guide.icon />
+                                <span>{guide.title}</span>
+                                {#if currentPath === guide.url || (!guide.exact && currentPath.startsWith(`${guide.url}/`))}
                                     {@render activeRouteIndicator()}
                                 {/if}
                             </a>

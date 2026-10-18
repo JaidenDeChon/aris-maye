@@ -2,7 +2,7 @@ import { canonicalSkill } from '$lib/constants/skill-aliases';
 import type { HomepageAlmostUnlocked, HomepageItem } from '$lib/models/homepage';
 
 /**
- * A gp amount short enough for a tile: 950, 12.4k, 3.2M, 1.1B.
+ * A gp amount short enough for a tile: 950, 12.4k, 3.2M, 1.1B, 4.7T.
  * @param signed - Prefix a plus sign on positive amounts, for profits.
  */
 export function formatGpShort(value: number | null | undefined, signed = false): string {
@@ -10,6 +10,7 @@ export function formatGpShort(value: number | null | undefined, signed = false):
     const sign = value < 0 ? '-' : signed && value > 0 ? '+' : '';
     const abs = Math.abs(value);
     const units: [number, string][] = [
+        [1_000_000_000_000, 'T'],
         [1_000_000_000, 'B'],
         [1_000_000, 'M'],
         [1_000, 'k'],

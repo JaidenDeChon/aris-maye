@@ -10,6 +10,8 @@
     import { browser } from '$app/environment';
     import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
     import type { SkillTreePage } from '$lib/constants/skill-tree-pages';
+    import { findXpGuideSkill } from '$lib/constants/guides';
+    import { resolve } from '$app/paths';
     import { activeIsIronman, getStoreRoot } from '$lib/stores/character-store.svelte';
     import { getAccountTypeOption } from '$lib/models/account-type';
     import { bankItemsStore, ensureSuppliesForCharacter, getSuppliesForCharacter } from '$lib/stores/bank-items-store';
@@ -72,6 +74,8 @@
     const skill = $derived(props.skill ?? null);
     const skillSlug = $derived(skill?.slug ?? null);
     const headingLabel = $derived(skill?.title ?? headingProp);
+    // Skill pages rank by profit; the guide ranks the same recipes by what their XP costs.
+    const xpGuide = $derived(findXpGuideSkill(skillSlug));
 
     let loading = $state(true);
     let fetchedItems = $state([] as IGameItem[]);
@@ -555,11 +559,19 @@
 
 <div class="items-page pt-6 pb-8">
     <div class="content-sizing">
-        <div class="flex items-center mb-4 gap-3">
+        <div class="flex flex-wrap items-center mb-4 gap-x-3 gap-y-1">
             {#if skill}
                 <img src={skill.icon} alt={`${headingLabel} icon`} class="h-8 w-8" />
             {/if}
             <h1 class="text-3xl font-bold">{headingLabel}</h1>
+            {#if xpGuide}
+                <a
+                    href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: xpGuide.slug })}
+                    class="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline sm:ml-auto"
+                >
+                    Cheapest {xpGuide.title} XP →
+                </a>
+            {/if}
         </div>
     </div>
 

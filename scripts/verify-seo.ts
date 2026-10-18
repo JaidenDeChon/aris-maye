@@ -175,13 +175,18 @@ for (const loc of locs) check(loc === `${SITE}/` || loc.startsWith(`${SITE}/`), 
 console.log(`Sitemap: ${locs.length} URLs`);
 
 // 3. every page in the sitemap
+// A sample still audits every page that isn't an item page (home, browse and skill pages, the
+// guides), and samples only the thousands of item pages.
+const isItemPage = (loc: string) => /\/items\/\d+$/.test(loc);
 const targets = sample
-    ? locs.slice(0, 8).concat(
-          locs
-              .slice(8)
-              .sort(() => Math.random() - 0.5)
-              .slice(0, sample),
-      )
+    ? locs
+          .filter((loc) => !isItemPage(loc))
+          .concat(
+              locs
+                  .filter(isItemPage)
+                  .sort(() => Math.random() - 0.5)
+                  .slice(0, sample),
+          )
     : locs;
 const titleOwners = new Map<string, string>();
 let ingredientPages = 0;

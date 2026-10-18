@@ -1,4 +1,4 @@
-import mongoose, { type PipelineStage } from 'mongoose';
+import { type PipelineStage } from 'mongoose';
 import { OsrsboxItemModel } from '$lib/models/mongo-schemas/osrsbox-db-item-schema';
 import { CollectionMetadataModel } from '$lib/models/mongo-schemas/collection-metadata-schema';
 import {
@@ -25,6 +25,7 @@ import {
     HOMEPAGE_SNAPSHOT_MAX_AGE_MS,
 } from '$lib/constants/homepage';
 import { canonicalSkill } from '$lib/constants/skill-aliases';
+import { createSnapshotCache, mongoSnapshotCollection, type SnapshotCache } from '$lib/services/snapshot-cache.server';
 import { currencyItemNames } from '$lib/helpers/ingredient-price';
 import type {
     HomepageAlchPick,
@@ -54,11 +55,8 @@ const SNAPSHOT_VERSION = 5;
 /** How long this server instance reuses a snapshot it already read, before asking Mongo again. */
 const MEMORY_CACHE_MS = 60 * 1000;
 
-const memoryCache = new Map<string, { snapshot: HomepageSnapshot; readAt: number }>();
-const rebuildsInFlight = new Map<string, Promise<HomepageSnapshot>>();
-
 /** The fields a homepage tile reads, kept small because a snapshot holds a few dozen of them. */
-const ITEM_PROJECTION = {
+export const ITEM_PROJECTION = {
     _id: 0,
     id: 1,
     name: 1,
@@ -78,7 +76,7 @@ const ITEM_PROJECTION = {
     typicalPrice24h: 1,
 } as const;
 
-type RawItem = {
+export type RawItem = {
     id: number;
     name: string;
     icon: string;
@@ -97,7 +95,7 @@ type RawItem = {
     typicalPrice24h?: number | null;
 };
 
-function toHomepageItem(raw: RawItem): HomepageItem {
+export function toHomepageItem(raw: RawItem): HomepageItem {
     const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
     return {
         id: raw.id,
@@ -120,7 +118,7 @@ function toHomepageItem(raw: RawItem): HomepageItem {
 }
 
 /** The match every homepage query starts from: craftable items the reader can put a value on. */
-function baseCreationMatch(ironman: boolean): Record<string, unknown> {
+export function baseCreationMatch(ironman: boolean): Record<string, unknown> {
     return {
         'creationSpecs.0': { $exists: true },
         placeholder: false,
@@ -135,7 +133,11 @@ function baseCreationMatch(ironman: boolean): Record<string, unknown> {
  *
  * The pipeline is the expensive part, so it runs once and `$facet` cuts the result into lists.
  */
-async function computeCreationSections(ironman: boolean, natureRunePrice: number) {
+export async function computeCreationSections(
+    ironman: boolean,
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+) {
     const itemProjection = { $project: ITEM_PROJECTION };
     const rawItem = (path: string) =>
         Object.fromEntries(
@@ -172,17 +174,17 @@ async function computeCreationSections(ironman: boolean, natureRunePrice: number
         },
         {
             $facet: {
-                topProfit: [{ $sort: { creationProfit: -1, name: 1 } }, { $limit: HOMEPAGE_LIST_SIZE }, itemProjection],
+                topProfit: [{ $sort: { creationProfit: -1, name: 1 } }, { $limit: limit }, itemProjection],
                 topRoi: [
                     { $match: { creationProfit: { $gte: HOMEPAGE_MIN_ROI_PROFIT }, creationRoi: { $ne: null } } },
                     { $sort: { creationRoi: -1, name: 1 } },
-                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $limit: limit },
                     itemProjection,
                 ],
                 topGpPerLimit: [
                     { $match: { gpPerLimit: { $gt: 0 } } },
                     { $sort: { gpPerLimit: -1, name: 1 } },
-                    { $limit: HOMEPAGE_LIST_SIZE },
+                    { $limit: limit },
                     itemProjection,
                 ],
                 skillEarners: [
@@ -263,7 +265,10 @@ async function computeCreationSections(ironman: boolean, natureRunePrice: number
  *
  * The buy price is the instant-buy price (`highPrice`), since that's what it costs to get one now.
  */
-async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPick[]> {
+export async function computeAlchPicks(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageAlchPick[]> {
     const oldestPrice = Math.floor(Date.now() / 1000) - HOMEPAGE_ALCH_MAX_PRICE_AGE_S;
     const rows = await OsrsboxItemModel.aggregate<RawItem & { highalch: number; alchProfit: number }>([
         {
@@ -281,7 +286,7 @@ async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPi
         { $set: { alchProfit: { $subtract: [{ $subtract: ['$highalch', '$highPrice'] }, natureRunePrice] } } },
         { $match: { alchProfit: { $gt: 0 } } },
         { $sort: { alchProfit: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         { $project: { ...ITEM_PROJECTION, highalch: 1, alchProfit: 1 } },
     ]);
 
@@ -293,21 +298,29 @@ async function computeAlchPicks(natureRunePrice: number): Promise<HomepageAlchPi
     }));
 }
 
+/** Items that trade on the GE, without their noted, placeholder or stacked copies. */
+export const TRADEABLE_MATCH = { tradeable_on_ge: true, placeholder: false, noted: false, stacked: null } as const;
+
+/**
+ * The movers floor: enough gold and enough trades a day for a price change to mean something.
+ * See "Movers floor" in `docs/homepage-plan.md`.
+ */
+export const LIQUID_MATCH = {
+    priceChange24h: { $ne: null },
+    volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
+    tradedHours24h: { $gte: MOVERS_MIN_TRADED_HOURS },
+    $expr: {
+        $gte: [{ $multiply: ['$volume24h', { $ifNull: ['$typicalPrice24h', 0] }] }, MOVERS_MIN_GP_PER_DAY],
+    },
+};
+
 /**
  * What's trading on the GE: the most traded items this hour, and the biggest risers and fallers
  * over the last day among items that trade enough for their price to mean something.
  */
 async function computeMarketPulse(): Promise<HomepageMarketPulse> {
-    const tradeable = { tradeable_on_ge: true, placeholder: false, noted: false, stacked: null };
-    // The movers floor: enough gold and enough trades a day. See "Movers floor" in the plan doc.
-    const liquid = {
-        priceChange24h: { $ne: null },
-        volume24h: { $gte: MOVERS_MIN_TRADES_PER_DAY },
-        tradedHours24h: { $gte: MOVERS_MIN_TRADED_HOURS },
-        $expr: {
-            $gte: [{ $multiply: ['$volume24h', { $ifNull: ['$typicalPrice24h', 0] }] }, MOVERS_MIN_GP_PER_DAY],
-        },
-    };
+    const tradeable = TRADEABLE_MATCH;
+    const liquid = LIQUID_MATCH;
 
     const [facets] = await OsrsboxItemModel.aggregate<{
         historyHours: { hours: number }[];
@@ -362,7 +375,10 @@ function alchAfterRuneExpr(natureRunePrice: number) {
  *
  * Only shops that pay in coins count; a Tokkul price isn't gp.
  */
-async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSale[]> {
+export async function computeShopSales(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageShopSale[]> {
     const rows = await OsrsboxItemModel.aggregate<
         RawItem & {
             shop: string;
@@ -374,7 +390,14 @@ async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSa
     >([
         { $match: { 'storePrices.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
         { $unwind: '$storePrices' },
-        { $match: { 'storePrices.currency': null, 'storePrices.firstPrice': { $gt: 0 } } },
+        // "Unused shops" is a wiki category the scraper picked up, not somewhere a player can sell.
+        {
+            $match: {
+                'storePrices.currency': null,
+                'storePrices.firstPrice': { $gt: 0 },
+                'storePrices.shop': { $ne: 'Unused shops' },
+            },
+        },
         { $set: { alchValue: alchAfterRuneExpr(natureRunePrice) } },
         { $set: { gain: { $subtract: ['$storePrices.firstPrice', '$alchValue'] } } },
         { $match: { gain: { $gt: 0 } } },
@@ -383,7 +406,7 @@ async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSa
         { $group: { _id: '$id', doc: { $first: '$$ROOT' } } },
         { $replaceRoot: { newRoot: '$doc' } },
         { $sort: { gain: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         {
             $project: {
                 ...ITEM_PROJECTION,
@@ -413,7 +436,10 @@ async function computeShopSales(natureRunePrice: number): Promise<HomepageShopSa
  * Any ingredient no shop sells rules the creation out. Only shops that also buy from players are in
  * the scraped data, so this can miss a few sell-only shops.
  */
-async function computeShopSupplied(natureRunePrice: number): Promise<HomepageItem[]> {
+export async function computeShopSupplied(
+    natureRunePrice: number,
+    limit: number = HOMEPAGE_LIST_SIZE,
+): Promise<HomepageItem[]> {
     const rows = await OsrsboxItemModel.aggregate<RawItem>([
         { $match: { 'creationSpecs.0': { $exists: true }, placeholder: false, noted: false, stacked: null } },
         { $set: { primarySpec: buildPrimarySpecExpression() } },
@@ -542,7 +568,7 @@ async function computeShopSupplied(natureRunePrice: number): Promise<HomepageIte
             },
         },
         { $sort: { creationProfit: -1, name: 1 } },
-        { $limit: HOMEPAGE_LIST_SIZE },
+        { $limit: limit },
         { $project: ITEM_PROJECTION },
     ] as unknown as PipelineStage[]).allowDiskUse(true);
 
@@ -586,49 +612,30 @@ export async function computeHomepageSnapshot(ironman: boolean): Promise<Homepag
     };
 }
 
-type SnapshotDoc = {
-    _id: string;
-    snapshot?: HomepageSnapshot;
-    /** When a request last claimed this snapshot's rebuild. See `getFreshHomepageSnapshot`. */
-    rebuildingAt?: number;
-};
-
-/** How long a claimed rebuild holds off other requests before they assume it died and try again. */
-const REBUILD_CLAIM_MS = 2 * 60 * 1000;
-
-function snapshotCollection() {
-    return mongoose.connection.collection<SnapshotDoc>(SNAPSHOT_COLLECTION);
-}
-
-/** Rebuilds a snapshot and stores it. The hourly price job calls this so visitors rarely wait. */
-export async function refreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
-    const snapshot = await computeHomepageSnapshot(ironman);
-    await snapshotCollection().updateOne(
-        { _id: snapshotKey(ironman) },
-        { $set: { snapshot }, $unset: { rebuildingAt: '' } },
-        { upsert: true },
-    );
-    memoryCache.set(snapshotKey(ironman), { snapshot, readAt: Date.now() });
-    return snapshot;
-}
-
-/** Rebuilds a snapshot once, however many requests in this instance ask for it at the same time. */
-function rebuildOnce(ironman: boolean): Promise<HomepageSnapshot> {
-    const key = snapshotKey(ironman);
-    const inFlight = rebuildsInFlight.get(key);
-    if (inFlight) return inFlight;
-
-    const rebuild = refreshHomepageSnapshot(ironman).finally(() => rebuildsInFlight.delete(key));
-    rebuildsInFlight.set(key, rebuild);
-    return rebuild;
-}
+const snapshotCaches = new Map<boolean, SnapshotCache<HomepageSnapshot>>();
 
 function snapshotKey(ironman: boolean): string {
     return `${ironman ? 'ironman' : 'ge'}-v${SNAPSHOT_VERSION}`;
 }
 
-function isStale(snapshot: HomepageSnapshot): boolean {
-    return Date.now() - snapshot.computedAt >= HOMEPAGE_SNAPSHOT_MAX_AGE_MS;
+function snapshotCache(ironman: boolean): SnapshotCache<HomepageSnapshot> {
+    let cache = snapshotCaches.get(ironman);
+    if (!cache) {
+        cache = createSnapshotCache({
+            collection: mongoSnapshotCollection<HomepageSnapshot>(SNAPSHOT_COLLECTION),
+            key: snapshotKey(ironman),
+            compute: () => computeHomepageSnapshot(ironman),
+            maxAgeMs: HOMEPAGE_SNAPSHOT_MAX_AGE_MS,
+            memoryMs: MEMORY_CACHE_MS,
+        });
+        snapshotCaches.set(ironman, cache);
+    }
+    return cache;
+}
+
+/** Rebuilds a snapshot and stores it. The hourly price job calls this so visitors rarely wait. */
+export function refreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
+    return snapshotCache(ironman).refresh();
 }
 
 /**
@@ -638,20 +645,9 @@ function isStale(snapshot: HomepageSnapshot): boolean {
  * - Otherwise it's read from Mongo, and returned even when it's stale. The browser sees the old
  *   `computedAt` and asks `getFreshHomepageSnapshot` for a new one.
  * - Only when there's no snapshot at all does the caller wait for one to be built.
- *
- * This never starts a rebuild it doesn't wait for: on Netlify a function is frozen once it has
- * answered, so a rebuild left running in the background never finishes.
  */
-export async function getHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
-    const key = snapshotKey(ironman);
-    const remembered = memoryCache.get(key);
-    if (remembered && Date.now() - remembered.readAt < MEMORY_CACHE_MS) return remembered.snapshot;
-
-    const cached = await snapshotCollection().findOne({ _id: key });
-    if (!cached?.snapshot) return rebuildOnce(ironman);
-
-    memoryCache.set(key, { snapshot: cached.snapshot, readAt: Date.now() });
-    return cached.snapshot;
+export function getHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
+    return snapshotCache(ironman).get();
 }
 
 /**
@@ -660,33 +656,8 @@ export async function getHomepageSnapshot(ironman: boolean): Promise<HomepageSna
  * Only one request across every server instance rebuilds a stale snapshot at a time: it claims the
  * rebuild in Mongo first, and any other request that finds it claimed gets the stale one back.
  */
-export async function getFreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
-    const key = snapshotKey(ironman);
-    const cached = await snapshotCollection().findOne({ _id: key });
-    if (!cached?.snapshot) return rebuildOnce(ironman);
-    if (!isStale(cached.snapshot)) {
-        memoryCache.set(key, { snapshot: cached.snapshot, readAt: Date.now() });
-        return cached.snapshot;
-    }
-
-    const now = Date.now();
-    const claim = await snapshotCollection().updateOne(
-        {
-            _id: key,
-            $or: [{ rebuildingAt: { $exists: false } }, { rebuildingAt: { $lt: now - REBUILD_CLAIM_MS } }],
-        },
-        { $set: { rebuildingAt: now } },
-    );
-    if (!claim.modifiedCount) return cached.snapshot;
-
-    try {
-        return await rebuildOnce(ironman);
-    } catch (error) {
-        await snapshotCollection()
-            .updateOne({ _id: key }, { $unset: { rebuildingAt: '' } })
-            .catch(() => {});
-        throw error;
-    }
+export function getFreshHomepageSnapshot(ironman: boolean): Promise<HomepageSnapshot> {
+    return snapshotCache(ironman).getFresh();
 }
 
 let pulseCache: { pulse: HomepageMarketPulse; readAt: number } | null = null;
@@ -717,20 +688,14 @@ export type HomepageStatus = {
 };
 
 export async function getHomepageStatus(): Promise<HomepageStatus> {
-    const keys = [snapshotKey(false), snapshotKey(true)];
-    const [metadata, itemsWithVolumeHistory, pulse, docs] = await Promise.all([
+    const [metadata, itemsWithVolumeHistory, pulse, ge, ironman] = await Promise.all([
         CollectionMetadataModel.findOne({ collectionName: 'items' }).lean().exec(),
         OsrsboxItemModel.countDocuments({ 'volumeHistory.0': { $exists: true } }).exec(),
         computeMarketPulse(),
-        snapshotCollection()
-            .find({ _id: { $in: keys } }, { projection: { 'snapshot.computedAt': 1, rebuildingAt: 1 } })
-            .toArray(),
+        snapshotCache(false).status(),
+        snapshotCache(true).status(),
     ]);
-    const snapshots: HomepageStatus['snapshots'] = {};
-    for (const key of keys) {
-        const doc = docs.find((d) => d._id === key);
-        snapshots[key] = { computedAt: doc?.snapshot?.computedAt ?? null, rebuildingAt: doc?.rebuildingAt ?? null };
-    }
+    const snapshots: HomepageStatus['snapshots'] = { [snapshotKey(false)]: ge, [snapshotKey(true)]: ironman };
     return {
         pricesUpdatedAt: metadata?.lastUpdated ?? null,
         itemsWithVolumeHistory,

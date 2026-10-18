@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { GUIDE_PAGES, XP_GUIDE_SKILLS } from '$lib/constants/guides';
 import { skillTreePages } from '$lib/constants/skill-tree-pages';
 import {
     SITEMAP_MAX_URLS,
@@ -29,6 +30,17 @@ describe('sitemapUrls', () => {
         for (const skill of skillTreePages) expect(urls).toContain(`${BASE}/items/${skill.slug}`);
         expect(urls.filter((u) => u === `${BASE}/items/2`)).toHaveLength(1);
         expect(new Set(urls).size).toBe(urls.length);
+    });
+
+    it('lists the guides hub, every guide and every cheapest XP skill page once', () => {
+        const urls = sitemapUrls([], BASE);
+        const guides = [
+            '/guides',
+            ...GUIDE_PAGES.map((guide) => guide.path),
+            ...XP_GUIDE_SKILLS.map((skill) => `/guides/cheapest-xp/${skill.slug}`),
+        ];
+        expect(guides).toHaveLength(13);
+        for (const path of guides) expect(urls.filter((u) => u === `${BASE}${path}`)).toHaveLength(1);
     });
 });
 

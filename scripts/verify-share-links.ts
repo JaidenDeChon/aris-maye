@@ -29,7 +29,8 @@ const SAVED = JSON.stringify({
     useSupplies: false,
     profitMode: false,
 });
-const DEFAULT_IMAGE = 'https://aris-maye.com/other-images/share-thumb.png';
+// The share image comes from whichever host served the page (see seo-head.svelte), so only its path is fixed.
+const DEFAULT_IMAGE_PATH = '/other-images/share-thumb.png';
 const shots = join(tmpdir(), 'verify-share-links');
 mkdirSync(shots, { recursive: true });
 
@@ -339,7 +340,10 @@ const head = await page.evaluate(() => ({
 }));
 check(head.canonical === 'https://aris-maye.com/items', `9. canonical is /items (${head.canonical})`);
 check(head.robots === 'index, follow', `9. robots is index, follow (${head.robots})`);
-check(head.image === DEFAULT_IMAGE, `9. og:image is the default thumbnail (${head.image})`);
+check(
+    Boolean(head.image) && new URL(head.image!).pathname === DEFAULT_IMAGE_PATH,
+    `9. og:image is the default thumbnail (${head.image})`,
+);
 const html = await (await fetch(`${baseUrl}/items?filter=members&profit=1`)).text();
 check(
     html.includes('<link rel="canonical" href="https://aris-maye.com/items"'),

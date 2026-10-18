@@ -49,7 +49,13 @@
     </div>
 {/snippet}
 
-<HomeBand title="Market pulse" blurb="What's trading on the Grand Exchange" {compact} showSeeAll={false}>
+<HomeBand
+    title="Market pulse"
+    blurb="What's trading on the Grand Exchange"
+    {compact}
+    seeAllHref="/guides/market"
+    seeAllLabel="Full market report"
+>
     <div class="grid gap-6 lg:grid-cols-3">
         {@render column('Most traded this hour', pulse.mostTraded, 'traded', 'No trades recorded this hour.')}
         {@render column('Rising today', pulse.risers, 'rise', 'Nothing busy has risen today.')}
