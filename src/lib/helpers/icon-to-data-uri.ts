@@ -17,4 +17,15 @@ export function iconToDataUri(icon?: string | null): string {
     return `data:image/png;base64,${icon}`;
 }
 
+/**
+ * An icon string (raw base64 or a data URI) as image bytes and their content type, for serving it
+ * as a file. Null when there's nothing to decode.
+ */
+export function decodeIcon(icon?: string | null): { bytes: Uint8Array; contentType: string } | null {
+    const match = iconToDataUri(icon).match(/^data:([^;,]+);base64,(.+)$/);
+    if (!match) return null;
+    const bytes = Uint8Array.from(Buffer.from(match[2], 'base64'));
+    return bytes.length ? { bytes, contentType: match[1] } : null;
+}
+
 export default iconToDataUri;
