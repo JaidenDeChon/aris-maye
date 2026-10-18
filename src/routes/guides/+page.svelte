@@ -12,7 +12,7 @@
 
 <GuideHeader
     title="OSRS guides"
-    answer="Lists that answer the questions players ask most, worked out from live Grand Exchange prices and kept up to date every hour."
+    answer="Answers to the questions players ask most, worked out from live Grand Exchange prices and updated every hour."
 />
 
 <ul class="grid gap-4 sm:grid-cols-2">
@@ -29,7 +29,7 @@
     {/each}
 </ul>
 
-<GuideSection title="Cheapest XP by skill" blurb="The cheapest way to train each skill, level by level.">
+<GuideSection title="Cheapest XP by skill" blurb="Pick a skill to see the cheapest way to train it at every level.">
     <ul class="flex flex-wrap gap-2">
         {#each XP_GUIDE_SKILLS as skill (skill.slug)}
             <li>
