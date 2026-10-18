@@ -82,6 +82,6 @@ export const GUIDE_PAGES: GuidePage[] = [
         key: 'ironman',
         path: '/guides/ironman-money-making',
         title: 'Ironman money making',
-        blurb: 'Ways to make money without the Grand Exchange: shops, shop-bought crafts and alching.',
+        blurb: 'Ways to make money without the Grand Exchange: selling to shops, making things from shop stock and alching.',
     },
 ];

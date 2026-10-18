@@ -1,4 +1,8 @@
 {
+    "src/lib/constants/guides.ts": {
+        "humanized_at": "2026-10-18T03:14:14Z",
+        "sha256": "f5d6a79879b7971a0f27b2492c864e465313e35376ed8bea653d4b4fb3e7327c"
+    },
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
