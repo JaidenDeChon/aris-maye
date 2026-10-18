@@ -297,3 +297,48 @@ A committed script in the style of `verify-share-links`. It exits non-zero on an
 - After the production deploy: confirm the Netlify log shows each refresh target succeeding, then
   resubmit the sitemap in Search Console and inspect `/guides/high-alch` and `/guides/cheapest-xp/herblore`.
 - Share `/guides/market` in Discord and check the card looks like an item card's.
+
+## Decisions made during implementation
+
+Real data and the page checks showed cases the design above didn't anticipate. The code follows
+these, and they take precedence over the sections above where the two differ.
+
+- **Eight skills, not ten.** Valued from GE prices, Farming has only three methods (tradeable
+  composts) and Firemaking's are all pyre logs with no Firemaking level in the data, so its page
+  would claim everything is level 1. Both are dropped, which makes 13 guide URLs. The data check
+  enforces the rule: at least 10 rows across at least three level bands.
+- **Cheapest XP keeps the homepage's ranking.** Everything that pays counts as 0 gp/xp, and among
+  those, the most XP each ranks first. Ranking paying methods by what they earn per XP was tried
+  and dropped: the overview filled with money makers such as a 3rd age felling axe that pays 1.5B
+  for 5 XP. A paying method still shows what it earns per XP, in green.
+- **The app layout's content column gets `min-w-0`.** Without it, the sidebar inset (a flex child)
+  grew to a table's width, and every guide scrolled sideways on a phone. With it, each table
+  scrolls in its own box, as the spec intended.
+- **"Unused shops" is left out of shop sales.** It's a wiki category the scraper picked up, not a
+  shop. This also changes the homepage's Ironman corner, for the better.
+- **Short gp amounts gain a T.** A day of GE trading is about 4.7T gp, which read as "4716B".
+- **The Ironman page says "From shop prices and alch values"** where the other guides say "From
+  Grand Exchange prices".
+- **`/api/homepage/status` also reports the guide snapshots**, so a deploy can be checked in one
+  place.
+- **`verify-seo` is unchanged.** The guide-specific checks all live in `verify-guide-pages`. Its
+  item-link count matches the site's relative links (`../items/2`), and the cheapest XP overview
+  needs one row per skill rather than 10.
+- **The market report's second tab is in the server HTML too.** bits-ui renders inactive tab
+  content, so a crawler gets both "Most traded" lists.
+
+Results on `osrsbox-prod` (the same on `osrsbox-dev`):
+
+| Skill        | 1–19 | 20–39 | 40–59 | 60–79 | 80–99 |
+| ------------ | ---- | ----- | ----- | ----- | ----- |
+| Construction | 8    | 8     | 8     | 8     | 8     |
+| Cooking      | 8    | 8     | 8     | 8     | 8     |
+| Crafting     | 8    | 8     | 8     | 8     | 8     |
+| Fletching    | 8    | 8     | 8     | 8     | 8     |
+| Herblore     | 8    | 8     | 8     | 8     | 8     |
+| Magic        | 8    | 8     | 8     | 8     | 8     |
+| Runecrafting | 8    | 0     | 5     | 6     | 2     |
+| Smithing     | 8    | 8     | 8     | 8     | 8     |
+
+Build times: cheapest XP about 1.7 s, Ironman about 1 s, market report about 0.2 s and high alch
+about 0.1 s. All four fit comfortably inside a function's time limit.
