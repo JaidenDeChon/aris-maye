@@ -36,6 +36,10 @@ function entry(id: number, profit: number, ...shortfalls: [string, number, numbe
 }
 
 describe('formatGpShort', () => {
+    it('shortens trillions, such as a day of GE trading', () => {
+        expect(formatGpShort(4_716_000_000_000)).toBe('4.7T');
+    });
+
     it('keeps small amounts whole', () => {
         expect(formatGpShort(950)).toBe('950');
     });
