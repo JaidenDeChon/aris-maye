@@ -53,7 +53,10 @@
 
 <SeoHead seo={geTaxCalculatorSeo} />
 
-<GuideHeader title="GE tax calculator" answer="How much the Grand Exchange takes when you sell, and what you keep." />
+<GuideHeader
+    title="GE tax calculator"
+    answer="How much tax the Grand Exchange takes when you sell, and how much you keep."
+/>
 
 <section class="flex min-w-0 flex-col gap-4 rounded-md border bg-muted/20 p-4" aria-label="Your sale">
     <div class="grid gap-4 sm:grid-cols-3">
@@ -94,7 +97,7 @@
                 type="number"
                 inputmode="numeric"
                 min="0"
-                placeholder="For profit"
+                placeholder="To work out profit"
                 value={input.buy ?? ''}
                 oninput={(event) => update({ buy: readBox(event, 0) })}
                 class="tabular-nums"

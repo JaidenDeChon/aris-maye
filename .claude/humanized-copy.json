@@ -15,6 +15,10 @@
         "humanized_at": "2026-10-18T05:27:26Z",
         "sha256": "149598ddab280719801c80ee176b06b0a62215ce6c63705144d5c5cb215e753f"
     },
+    "src/routes/calculators/ge-tax/+page.svelte": {
+        "humanized_at": "2026-10-18T05:27:48Z",
+        "sha256": "5dbbd134e1aa4396d3c0bfc2c5d79e8824f4285a59aec2dc90f95ab449f748b2"
+    },
     "src/routes/guides/+page.svelte": {
         "humanized_at": "2026-10-18T03:12:35Z",
         "sha256": "3e64311d03490030122e92566212e03f505db7ee25a8cdbdfddf7bf15ce6f3be"
