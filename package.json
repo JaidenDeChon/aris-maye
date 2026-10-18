@@ -21,6 +21,7 @@
         "verify-calculators": "bun run --env-file .env scripts/verify-calculators.ts",
         "verify-calculator-pages": "bun scripts/verify-calculator-pages.ts",
         "verify-guide-pages": "bun scripts/verify-guide-pages.ts",
+        "extract-hero-model": "bun scripts/extract-hero-model.ts",
         "update-item-prices": "bun run --env-file .env scripts/run-update-item-prices.ts",
         "remove-duplicate-items": "bun run --env-file .env scripts/remove-duplicate-items.ts",
         "normalize-wiki-names": "bun run --env-file .env scripts/normalize-wiki-names.ts",
