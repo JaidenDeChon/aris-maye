@@ -16,6 +16,7 @@ const { computeCheapestXp, computeHighAlch, computeIronmanGuide, computeMarketRe
 const { getGameItemById } = await import('../src/lib/services/game-item-mongo-service.server');
 const { XP_GUIDE_SKILLS, XP_LEVEL_BANDS } = await import('../src/lib/constants/guides');
 const { PRICE_CHANGE_MIN_HOURS } = await import('../src/lib/constants/market');
+const { compareXpMethods } = await import('../src/lib/helpers/guides');
 
 /** A build slower than this might not fit in a function's time limit on Netlify. */
 const SLOW_BUILD_MS = 8_000;
@@ -64,7 +65,10 @@ for (const { slug } of XP_GUIDE_SKILLS) {
             );
             const previous = band.rows[i - 1];
             if (previous) {
-                check(previous.gpPerXp <= row.gpPerXp, `Cheapest XP: ${slug} ${band.min}-${band.max} isn't sorted.`);
+                check(
+                    compareXpMethods(previous, row) <= 0,
+                    `Cheapest XP: ${slug} ${band.min}-${band.max} isn't sorted.`,
+                );
             }
         });
     }
