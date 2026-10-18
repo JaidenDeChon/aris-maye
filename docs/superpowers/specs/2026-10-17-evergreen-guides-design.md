@@ -317,6 +317,9 @@ these, and they take precedence over the sections above where the two differ.
 - **"Unused shops" is left out of shop sales.** It's a wiki category the scraper picked up, not a
   shop. This also changes the homepage's Ironman corner, for the better.
 - **Short gp amounts gain a T.** A day of GE trading is about 4.7T gp, which read as "4716B".
+- **No "How we work this out" sections.** Removed at the owner's request after review. The two
+  cross-links they carried stay as single lines: the high alch list links to the cheapest Magic
+  XP, and each cheapest XP skill page links to that skill's money makers.
 - **The Ironman page says "From shop prices and alch values"** where the other guides say "From
   Grand Exchange prices".
 - **`/api/homepage/status` also reports the guide snapshots**, so a deploy can be checked in one

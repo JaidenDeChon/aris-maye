@@ -9,13 +9,7 @@
     import * as Table from '$lib/components/ui/table';
     import * as Tabs from '$lib/components/ui/tabs';
     import { GUIDE_ROWS } from '$lib/constants/guides';
-    import {
-        MOVERS_MIN_GP_PER_DAY,
-        MOVERS_MIN_TRADED_HOURS,
-        MOVERS_MIN_TRADES_PER_DAY,
-        MOVERS_PRICE_HOURS,
-        PRICE_CHANGE_MIN_HOURS,
-    } from '$lib/constants/market';
+    import { PRICE_CHANGE_MIN_HOURS } from '$lib/constants/market';
     import { formatChange, formatGpShort } from '$lib/helpers/homepage';
     import type { MarketItem } from '$lib/models/guides';
     import { buildMarketSeo } from '$lib/seo/guide-seo';
@@ -142,27 +136,6 @@
             {@render tradedTable(report.mostTradedByCount, 'Most traded today by number of items')}
         </Tabs.Content>
     </Tabs.Root>
-</GuideSection>
-
-<GuideSection title="How we work this out">
-    <div class="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
-        <p>
-            Every hour we record how much of each item traded on the Grand Exchange and at what price, keeping the last
-            24 hours. An item's change compares the middle price of its last {MOVERS_PRICE_HOURS} traded hours with its first
-            {MOVERS_PRICE_HOURS}, so one odd trade at either end can't set it.
-        </p>
-        <p>
-            Only busy items count as risers or fallers: at least {formatGpShort(MOVERS_MIN_GP_PER_DAY)} gp and
-            {MOVERS_MIN_TRADES_PER_DAY} trades a day, spread over at least {MOVERS_MIN_TRADED_HOURS} of the 24 hours. Without
-            that, an item that sells three times a day could top the fallers list because one player dumped it cheap. Measuring
-            gold instead of a trade count means a 1.5B item that trades a dozen times a day counts, while feathers need far
-            more trades.
-        </p>
-        <p>
-            "GP traded" is the number traded times the day's middle price. The busiest items by count are usually cheap
-            runes and ammunition, which is why the GP list comes first.
-        </p>
-    </div>
 </GuideSection>
 
 <RelatedGuides current="market" />

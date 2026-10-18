@@ -83,30 +83,11 @@
     </GuideTable>
 </GuideSection>
 
-<GuideSection title="How we work this out">
-    <div class="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
-        <p>
-            Profit per cast is the item's high alch value, less what it costs to buy one straight away on the Grand
-            Exchange (the instant-buy price), less one nature rune at its current price of
-            {formatGpShort(guide.natureRunePrice)} gp. Prices more than a day old are left out, since nobody may be selling
-            at them any more.
-        </p>
-        <p>
-            High Level Alchemy needs 55 Magic and gives 65 Magic XP per cast. The fire runes are left out, because
-            casting with a fire staff (or a tome of fire) covers them.
-        </p>
-        <p>
-            Check "Traded today" before you buy a lot. If only a handful traded, the price may not hold once you start
-            buying, and the profit can vanish.
-        </p>
-        <p>
-            Training Magic as well? See the
-            <a
-                href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: 'magic' })}
-                class="underline hover:text-primary">cheapest Magic XP</a
-            >.
-        </p>
-    </div>
-</GuideSection>
+<p class="text-sm text-muted-foreground">
+    Training Magic as well? See the
+    <a href={resolve('/guides/cheapest-xp/[skill=xpSkill]', { skill: 'magic' })} class="underline hover:text-primary"
+        >cheapest Magic XP</a
+    >.
+</p>
 
 <RelatedGuides current="high-alch" />

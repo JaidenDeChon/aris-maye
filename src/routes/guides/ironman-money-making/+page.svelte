@@ -147,23 +147,4 @@
     </GuideTable>
 </GuideSection>
 
-<GuideSection title="How we work this out">
-    <div class="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
-        <p>
-            Nothing here uses the Grand Exchange. An ingredient is worth the cheaper of its lowest shop price and its
-            alch value, and a finished item is worth the higher of what the best shop pays for it and its alch value.
-            Every alch costs a nature rune at the cheapest shop price, {formatGpShort(guide.natureRunePrice)} gp.
-        </p>
-        <p>
-            Shop prices drop as you sell more to the same shop, so "Sales to lowest" says how many you can sell before
-            the price bottoms out. Shop stock comes from shops that also buy from players, so a few shops that only sell
-            are missing.
-        </p>
-        <p>
-            We can't tell which ingredients you can gather yourself and which only drop from monsters, so "Make from
-            shop stock" is the list you can rely on without a trip anywhere else.
-        </p>
-    </div>
-</GuideSection>
-
 <RelatedGuides current="ironman" />

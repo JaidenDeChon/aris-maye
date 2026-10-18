@@ -61,26 +61,14 @@
     </p>
 {/each}
 
-<GuideSection title="How we work this out">
-    <div class="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
-        <p>
-            Each method is priced from the Grand Exchange, the same way as the rest of the site, including the 2% GE tax
-            on the sale. What's lost on each one, divided by the {skill.title} XP it gives, is its cost per XP. Anything that
-            makes a profit costs nothing per XP: it's marked "Pays", with what it earns per XP in green. In each level range
-            the cheapest come first, and among the free ones, the most XP each.
-        </p>
-        <p>This ranks by cost alone. A cheap method can still be slow if each action takes a while.</p>
-        {#if moneyMakers}
-            <p>
-                Want gold rather than XP? See the
-                <a
-                    href={resolve('/items/[skill=skill]', { skill: moneyMakers.slug })}
-                    class="underline hover:text-primary">most profitable {skill.title} items</a
-                >.
-            </p>
-        {/if}
-    </div>
-</GuideSection>
+{#if moneyMakers}
+    <p class="text-sm text-muted-foreground">
+        Want gold rather than XP? See the
+        <a href={resolve('/items/[skill=skill]', { skill: moneyMakers.slug })} class="underline hover:text-primary"
+            >most profitable {skill.title} items</a
+        >.
+    </p>
+{/if}
 
 <GuideSection title="Cheapest XP in other skills">
     <ul class="flex flex-wrap gap-2">

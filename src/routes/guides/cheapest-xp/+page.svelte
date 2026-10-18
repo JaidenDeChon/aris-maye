@@ -59,19 +59,4 @@
     </GuideTable>
 </GuideSection>
 
-<GuideSection title="How we work this out">
-    <div class="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
-        <p>
-            For everything you can make, we price the ingredients and the finished item from the Grand Exchange, the
-            same way as the rest of the site, including the 2% GE tax on the sale. What's lost on each one, divided by
-            the XP it gives, is its cost per XP. Anything that makes a profit costs nothing per XP: it's marked "Pays",
-            with what it earns per XP in green, and among those the one with the most XP each ranks first.
-        </p>
-        <p>
-            This ranks by cost alone. A cheap method can still be slow if each action takes a while, so check how fast
-            it is before you commit to it.
-        </p>
-    </div>
-</GuideSection>
-
 <RelatedGuides current="cheapest-xp" />
