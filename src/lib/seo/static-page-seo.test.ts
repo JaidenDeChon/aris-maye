@@ -8,6 +8,7 @@ import {
     homeSeo,
     itemsSeo,
     myCharacterSeo,
+    transmogSeo,
 } from './static-page-seo';
 import { DESCRIPTION_MAX, DESCRIPTION_MIN, TITLE_MAX } from './fit-text';
 
@@ -15,6 +16,7 @@ describe('static page SEO', () => {
     it.each([
         ['home', homeSeo],
         ['items', itemsSeo],
+        ['transmog', transmogSeo],
         ...skillTreePages.map((skill) => [skill.slug, buildSkillSeo(skill)] as const),
     ])('%s is indexable and within limits', (_, seo) => {
         expect(seo.robots).toBe('index');
@@ -40,7 +42,9 @@ describe('static page SEO', () => {
     });
 
     it('gives every fixed page a different title', () => {
-        const titles = [homeSeo, itemsSeo, favoritesSeo, hiddenSeo, myCharacterSeo, addItemSeo].map((s) => s.title);
+        const titles = [homeSeo, itemsSeo, transmogSeo, favoritesSeo, hiddenSeo, myCharacterSeo, addItemSeo].map(
+            (s) => s.title,
+        );
         expect(new Set(titles).size).toBe(titles.length);
     });
 });
