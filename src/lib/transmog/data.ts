@@ -104,3 +104,8 @@ export async function buildOutfitMesh(
 export function slotSprite(key: string): string {
     return `${BASE}/ui/${key}.png`;
 }
+
+/** The emote tab's icon for an emote (keyed as in EMOTES). */
+export function emoteIcon(key: string): string {
+    return `${BASE}/ui/emotes/${key}.png`;
+}

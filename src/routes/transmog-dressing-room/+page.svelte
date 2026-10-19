@@ -17,7 +17,7 @@
     import type { Gender, WearableItem } from '$lib/osrs-model/types';
     import { canonicalUrl } from '$lib/seo/page-seo';
     import { transmogSeo } from '$lib/seo/static-page-seo';
-    import { buildOutfitMesh, loadTransmogData, type TransmogData } from '$lib/transmog/data';
+    import { buildOutfitMesh, emoteIcon, loadTransmogData, type TransmogData } from '$lib/transmog/data';
     import {
         EMOTES,
         EMPTY_OUTFIT,
@@ -159,22 +159,25 @@
             The outfit data isn't available right now. Please try again later.
         </div>
     {:else if !transmog}
-        <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem]" aria-busy="true">
-            <Skeleton class="h-[26rem] md:h-[34rem]" />
-            <Skeleton class="h-[26rem] md:h-[34rem]" />
+        <div class="grid gap-6 md:grid-cols-[22rem_minmax(0,1fr)]" aria-busy="true">
+            <Skeleton class="h-[26rem] md:order-2 md:h-[40rem]" />
+            <Skeleton class="h-[26rem] md:h-[40rem]" />
         </div>
     {:else}
-        <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
-            <div class="flex min-w-0 flex-col gap-3">
+        <!-- Controls on the left and the character on the right; on phones the character comes first. -->
+        <div class="grid gap-6 md:grid-cols-[22rem_minmax(0,1fr)]">
+            <div class="min-w-0 md:sticky md:top-20 md:col-start-2 md:row-start-1 md:self-start">
                 <TransmogViewer
                     bind:this={viewer}
                     manifest={transmog.manifest}
                     {mesh}
                     {textures}
                     idle={idleFor(outfit)}
-                    class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[34rem]"
+                    class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[min(40rem,calc(100dvh-6rem))]"
                 />
+            </div>
 
+            <div class="flex min-w-0 flex-col gap-4 md:col-start-1 md:row-start-1">
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="flex rounded-md border p-0.5" role="radiogroup" aria-label="Body">
                         {#each genders as option (option.value)}
@@ -219,23 +222,7 @@
                         <option value={emote.key}>{emote.label}</option>
                     {/each}
                 </select>
-                <section aria-label="Emotes" class="hidden flex-col gap-1.5 md:flex">
-                    <h2 class="text-sm font-semibold">Emotes</h2>
-                    <div class="flex flex-wrap gap-1">
-                        {#each EMOTES as emote (emote.key)}
-                            <button
-                                type="button"
-                                class="rs-font rounded-sm border bg-muted/30 px-2 py-0.5 text-base leading-tight hover:border-primary/60 hover:bg-muted/60"
-                                onclick={() => viewer?.playEmote(emote.key)}
-                            >
-                                {emote.label}
-                            </button>
-                        {/each}
-                    </div>
-                </section>
-            </div>
 
-            <div class="flex min-w-0 flex-col gap-4">
                 <div class="hidden md:block">
                     <EquipmentSlots
                         {outfit}
@@ -262,6 +249,29 @@
                     onremove={(slot) => (outfit = unequip(outfit, slot))}
                     onclearslot={() => (selectedSlot = null)}
                 />
+
+                <section aria-labelledby="emotes-heading" class="hidden flex-col gap-1.5 md:flex">
+                    <h2 id="emotes-heading" class="text-sm font-semibold">Emotes</h2>
+                    <div class="grid grid-cols-6 gap-1">
+                        {#each EMOTES as emote (emote.key)}
+                            <button
+                                type="button"
+                                class="flex aspect-square items-center justify-center rounded-sm border bg-muted/30 hover:border-primary/60 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                                aria-label={emote.label}
+                                title={emote.label}
+                                onclick={() => viewer?.playEmote(emote.key)}
+                            >
+                                <img
+                                    src={emoteIcon(emote.key)}
+                                    alt=""
+                                    width="48"
+                                    height="48"
+                                    class="size-12 [image-rendering:pixelated]"
+                                />
+                            </button>
+                        {/each}
+                    </div>
+                </section>
             </div>
         </div>
 

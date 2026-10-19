@@ -4,7 +4,7 @@
  */
 
 /** Bump when the shape of these files changes, so stale build caches get regenerated. */
-export const TRANSMOG_DATA_VERSION = 1;
+export const TRANSMOG_DATA_VERSION = 2;
 
 export interface Animation {
     /** Client cycles (20ms) per frame. */

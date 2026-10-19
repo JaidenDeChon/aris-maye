@@ -82,6 +82,32 @@ const UI_SPRITES: Record<string, number> = {
     tile: 170,
 };
 
+/** Emote tab icons (the unlocked versions), keyed like ANIMATIONS. */
+const EMOTE_ICONS: Record<string, number> = {
+    yes: 700,
+    no: 701,
+    think: 702,
+    bow: 703,
+    angry: 704,
+    cry: 705,
+    laugh: 706,
+    cheer: 707,
+    wave: 708,
+    beckon: 709,
+    panic: 710,
+    clap: 711,
+    dance: 712,
+    jig: 713,
+    spin: 714,
+    headbang: 715,
+    jumpForJoy: 716,
+    raspberry: 717,
+    yawn: 718,
+    salute: 719,
+    shrug: 720,
+    blowKiss: 721,
+};
+
 /** The standard idle and the emotes, named the way the emote tab names them. */
 const ANIMATIONS: Record<string, number> = {
     idle: 808,
@@ -283,6 +309,11 @@ export function extractTransmogData(
         for (const [name, spriteId] of Object.entries(UI_SPRITES)) {
             const spriteData = cache.group(INDEX_SPRITES, spriteId);
             if (spriteData) writeFileSync(join(outDir, 'ui', `${name}.png`), spritePng(spriteData));
+        }
+        mkdirSync(join(outDir, 'ui', 'emotes'), { recursive: true });
+        for (const [name, spriteId] of Object.entries(EMOTE_ICONS)) {
+            const spriteData = cache.group(INDEX_SPRITES, spriteId);
+            if (spriteData) writeFileSync(join(outDir, 'ui', 'emotes', `${name}.png`), spritePng(spriteData));
         }
 
         // Animations

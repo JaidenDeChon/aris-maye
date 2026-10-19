@@ -21,8 +21,8 @@
 
     const { itemList, outfit, slot, onpick, onremove, onclearslot }: Props = $props();
 
-    /** Rows rendered at once; typing narrows the rest. */
-    const LIMIT = 80;
+    /** Rows added each time the list is scrolled to the bottom. */
+    const PAGE_SIZE = 80;
 
     let query = $state('');
     const slotInfo = $derived(slot === null ? null : SLOTS.find((s) => s.id === slot));
@@ -43,6 +43,29 @@
         const counts: Record<string, number> = {};
         for (const item of matches) counts[item.name] = (counts[item.name] ?? 0) + 1;
         return counts;
+    });
+
+    let limit = $state(PAGE_SIZE);
+    // A new search, slot or body starts back at the first page.
+    $effect(() => {
+        void matches;
+        limit = PAGE_SIZE;
+        if (list) list.scrollTop = 0;
+    });
+
+    let list: HTMLUListElement | undefined = $state();
+    let sentinel: HTMLLIElement | undefined = $state();
+    // Load the next page as the end of the list scrolls into view.
+    $effect(() => {
+        if (!list || !sentinel) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) limit += PAGE_SIZE;
+            },
+            { root: list, rootMargin: '0px 0px 200px 0px' },
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
     });
 
     let missingIcons = $state<Record<number, boolean>>({});
@@ -83,8 +106,12 @@
         bind:value={query}
     />
 
-    <ul class="max-h-80 min-h-0 overflow-y-auto rounded-md border bg-muted/20 md:max-h-[26rem]" aria-label="Items">
-        {#each matches.slice(0, LIMIT) as item (item.id)}
+    <ul
+        bind:this={list}
+        class="max-h-80 min-h-0 overflow-y-auto rounded-md border bg-muted/20 md:max-h-[26rem]"
+        aria-label="Items"
+    >
+        {#each matches.slice(0, limit) as item (item.id)}
             {@const worn = outfit.equipment[item.slot] === item.id}
             <li>
                 <button
@@ -121,10 +148,8 @@
         {:else}
             <li class="px-3 py-6 text-center text-sm text-muted-foreground">No wearable items match “{query}”.</li>
         {/each}
-        {#if matches.length > LIMIT}
-            <li class="px-3 py-2 text-center text-xs text-muted-foreground">
-                Showing {LIMIT} of {matches.length.toLocaleString('en-US')}. Type to narrow it down.
-            </li>
+        {#if matches.length > limit}
+            <li bind:this={sentinel} class="px-3 py-2 text-center text-xs text-muted-foreground">Loading more…</li>
         {/if}
     </ul>
 </div>
