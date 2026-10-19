@@ -15,6 +15,7 @@
         Shield,
         Calculator,
         Receipt,
+        Shirt,
     } from 'lucide-svelte';
     import { favoritesStore } from '$lib/stores/favorites-store';
     import { hiddenStore } from '$lib/stores/hidden-store';
@@ -43,6 +44,11 @@
             title: 'Browse items',
             url: '/items',
             icon: Sword,
+        },
+        {
+            title: 'Transmog',
+            url: '/transmog',
+            icon: Shirt,
         },
         {
             title: 'My character',

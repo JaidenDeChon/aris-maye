@@ -1,0 +1,269 @@
+<script lang="ts">
+    import { onMount, untrack } from 'svelte';
+    import { toast } from 'svelte-sonner';
+    import { replaceState } from '$app/navigation';
+    import { page } from '$app/state';
+    import SeoHead from '$lib/components/global/seo-head.svelte';
+    import GuideHeader from '$lib/components/guides/guide-header.svelte';
+    import EquipmentSlots from '$lib/components/transmog/equipment-slots.svelte';
+    import ItemPicker from '$lib/components/transmog/item-picker.svelte';
+    import OutfitCost from '$lib/components/transmog/outfit-cost.svelte';
+    import SavedOutfits from '$lib/components/transmog/saved-outfits.svelte';
+    import TransmogViewer from '$lib/components/transmog/transmog-viewer.svelte';
+    import { Button } from '$lib/components/ui/button';
+    import { Skeleton } from '$lib/components/ui/skeleton';
+    import type { Mesh } from '$lib/osrs-model/compose';
+    import type { Texture } from '$lib/osrs-model/rasterizer';
+    import type { Gender, WearableItem } from '$lib/osrs-model/types';
+    import { transmogSeo } from '$lib/seo/static-page-seo';
+    import { buildOutfitMesh, loadTransmogData, type TransmogData } from '$lib/transmog/data';
+    import {
+        EMOTES,
+        EMPTY_OUTFIT,
+        equip,
+        idleFor,
+        isEmptyOutfit,
+        outfitParams,
+        unequip,
+        validateOutfit,
+        type Outfit,
+    } from '$lib/transmog/outfit';
+
+    const { data } = $props();
+
+    let outfit = $state<Outfit>(untrack(() => data.outfit));
+    // Loaded once and never changed in place, so no deep reactivity (5,000 items would be slow to proxy).
+    let transmog = $state.raw<TransmogData | null>(null);
+    let loadError = $state(false);
+    let mesh = $state.raw<Mesh | null>(null);
+    let textures = $state.raw<Map<number, Texture>>(new Map());
+    let selectedSlot = $state<number | null>(null);
+    let viewer: TransmogViewer | undefined = $state();
+
+    onMount(() => {
+        loadTransmogData()
+            .then((loaded) => {
+                transmog = loaded;
+                outfit = validateOutfit(outfit, loaded.items);
+            })
+            .catch((error) => {
+                console.warn('Transmog data failed to load', error);
+                loadError = true;
+            });
+        return () => clearTimeout(urlTimer);
+    });
+
+    // Rebuild the model whenever the outfit changes. Only the newest request wins.
+    let build = 0;
+    $effect(() => {
+        const loaded = transmog;
+        const current = outfit;
+        if (!loaded) return;
+        const token = ++build;
+        buildOutfitMesh(loaded, current)
+            .then((result) => {
+                if (token !== build) return;
+                textures = result.textures;
+                mesh = result.mesh;
+            })
+            .catch((error) => {
+                console.warn('Outfit failed to build', error);
+                if (token === build) toast.error("That outfit couldn't be loaded. Try again in a moment.");
+            });
+    });
+
+    // Keep the address bar in step with the outfit, so the link always shares what's on screen.
+    let urlTimer: ReturnType<typeof setTimeout> | undefined;
+    $effect(() => {
+        const query = outfitParams(outfit).toString();
+        clearTimeout(urlTimer);
+        urlTimer = setTimeout(() => {
+            const path = location.pathname + (query ? `?${query}` : '');
+            if (path === location.pathname + location.search) return;
+            try {
+                // The path is the address bar's own, so it's already resolved.
+                // eslint-disable-next-line svelte/no-navigation-without-resolve
+                replaceState(path, { ...page.state });
+            } catch {
+                // The router isn't ready yet; the next change writes it.
+            }
+        }, 250);
+    });
+
+    function pick(item: WearableItem): void {
+        if (!transmog) return;
+        outfit = equip(outfit, item, transmog.items);
+    }
+
+    function setGender(gender: Gender): void {
+        outfit = { ...outfit, gender };
+    }
+
+    async function copyLink(): Promise<void> {
+        const query = outfitParams(outfit).toString();
+        const link = `${location.origin}${location.pathname}${query ? `?${query}` : ''}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            toast.success('Link copied');
+        } catch {
+            toast.error("Couldn't copy. Copy the address bar instead.");
+        }
+    }
+
+    async function download(): Promise<void> {
+        const blob = await viewer?.snapshot();
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'osrs-outfit.png';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    const genders: { value: Gender; label: string }[] = [
+        { value: 'male', label: 'Male' },
+        { value: 'female', label: 'Female' },
+    ];
+</script>
+
+<SeoHead seo={transmogSeo} />
+
+<div class="content-sizing flex flex-col gap-6 pt-6 pb-10">
+    <GuideHeader
+        title="Transmog"
+        answer="Try on any outfit in the game, in 3D. Then share it, save it, or see what it costs."
+    />
+
+    {#if loadError}
+        <div class="rounded-md border bg-muted/20 p-6 text-sm text-muted-foreground">
+            The outfit data isn't available right now. Please try again later.
+        </div>
+    {:else if !transmog}
+        <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem]" aria-busy="true">
+            <Skeleton class="h-[26rem] md:h-[34rem]" />
+            <Skeleton class="h-[26rem] md:h-[34rem]" />
+        </div>
+    {:else}
+        <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
+            <div class="flex min-w-0 flex-col gap-3">
+                <TransmogViewer
+                    bind:this={viewer}
+                    manifest={transmog.manifest}
+                    {mesh}
+                    {textures}
+                    idle={idleFor(outfit)}
+                    class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[34rem]"
+                />
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex rounded-md border p-0.5" role="radiogroup" aria-label="Body">
+                        {#each genders as option (option.value)}
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={outfit.gender === option.value}
+                                class="rounded px-3 py-1 text-sm transition-colors {outfit.gender === option.value
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'}"
+                                onclick={() => setGender(option.value)}
+                            >
+                                {option.label}
+                            </button>
+                        {/each}
+                    </div>
+                    <Button variant="outline" size="sm" onclick={() => viewer?.resetView()}>Reset view</Button>
+                    <Button variant="outline" size="sm" onclick={download}>Download image</Button>
+                    <Button variant="outline" size="sm" onclick={copyLink}>Copy link</Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={isEmptyOutfit(outfit)}
+                        onclick={() => (outfit = { ...EMPTY_OUTFIT, gender: outfit.gender })}
+                    >
+                        Take everything off
+                    </Button>
+                </div>
+
+                <!-- On phones a menu keeps the slots close to the viewer; wider screens get the emote tab. -->
+                <select
+                    class="h-9 rounded-md border bg-background px-3 text-sm md:hidden"
+                    aria-label="Play an emote"
+                    onchange={(event) => {
+                        const key = event.currentTarget.value;
+                        if (key) viewer?.playEmote(key);
+                        event.currentTarget.value = '';
+                    }}
+                >
+                    <option value="">Play an emote…</option>
+                    {#each EMOTES as emote (emote.key)}
+                        <option value={emote.key}>{emote.label}</option>
+                    {/each}
+                </select>
+                <section aria-label="Emotes" class="hidden flex-col gap-1.5 md:flex">
+                    <h2 class="text-sm font-semibold">Emotes</h2>
+                    <div class="flex flex-wrap gap-1">
+                        {#each EMOTES as emote (emote.key)}
+                            <button
+                                type="button"
+                                class="rs-font rounded-sm border bg-muted/30 px-2 py-0.5 text-base leading-tight hover:border-primary/60 hover:bg-muted/60"
+                                onclick={() => viewer?.playEmote(emote.key)}
+                            >
+                                {emote.label}
+                            </button>
+                        {/each}
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex min-w-0 flex-col gap-4">
+                <div class="hidden md:block">
+                    <EquipmentSlots
+                        {outfit}
+                        items={transmog.items}
+                        selected={selectedSlot}
+                        layout="grid"
+                        onselect={(slot) => (selectedSlot = slot)}
+                    />
+                </div>
+                <div class="md:hidden">
+                    <EquipmentSlots
+                        {outfit}
+                        items={transmog.items}
+                        selected={selectedSlot}
+                        layout="strip"
+                        onselect={(slot) => (selectedSlot = slot)}
+                    />
+                </div>
+                <ItemPicker
+                    itemList={transmog.itemList}
+                    {outfit}
+                    slot={selectedSlot}
+                    onpick={pick}
+                    onremove={(slot) => (outfit = unequip(outfit, slot))}
+                    onclearslot={() => (selectedSlot = null)}
+                />
+            </div>
+        </div>
+
+        <div class="grid gap-6 md:grid-cols-2">
+            <OutfitCost {outfit} items={transmog.items} />
+            <SavedOutfits
+                {outfit}
+                items={transmog.items}
+                onload={(saved) => transmog && (outfit = validateOutfit(saved, transmog.items))}
+            />
+        </div>
+
+        <p class="text-xs text-muted-foreground">
+            Models, textures and emotes come straight from the game's files (build {transmog.manifest.source.build ||
+                '?'}), via the
+            <a
+                href="https://archive.openrs2.org"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">OpenRS2 Archive</a
+            >. Weapons are held in the standard stance for now.
+        </p>
+    {/if}
+</div>

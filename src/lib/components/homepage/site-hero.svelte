@@ -2,7 +2,6 @@
     import { buttonVariants } from '$lib/components/ui/button';
     import CharacterStatsDialogButton from '../dialogs/character-stats-dialog.svelte';
     import { resolve } from '$app/paths';
-    import HeroPlayer from './hero-player.svelte';
     const { bgUrl } = $props();
 </script>
 
@@ -12,10 +11,13 @@
         <div
             class="h-96 w-96 rounded-full bg-primary absolute top-full right-1/4 translate-x-1/2 -translate-y-1/2 z-0 blur-3xl scale-150 opacity-5 xl:opacity-15"
         ></div>
-        <HeroPlayer
-            fallbackUrl={bgUrl}
-            class="absolute top-1/3 right-1/4 translate-x-1/2 -translate-y-1/3 z-10 opacity-15 transition-opacity xl:opacity-100 pointer-events-none"
-        />
+        {#if bgUrl}
+            <img
+                src={bgUrl}
+                alt="randomly-selected background"
+                class="w-64 absolute top-1/3 right-1/4 translate-x-1/2 -translate-y-1/4 z-10 opacity-15 transition-opacity xl:opacity-100"
+            />
+        {/if}
 
         <h1 class="rs-font-with-shadow dark:rs-font text-5xl md:text-6xl text-primary">Aris Maye</h1>
 

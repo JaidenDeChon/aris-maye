@@ -26,6 +26,14 @@ export function buildSkillSeo(skill: SkillTreePage): PageSeo {
     };
 }
 
+export const transmogSeo: PageSeo = {
+    title: 'OSRS Transmog: Try On Any Outfit in 3D',
+    description:
+        "Try on any wearable OSRS item in 3D, drawn from the game's own models. Mix outfits, play emotes, share a link and see the GE cost.",
+    canonicalPath: '/transmog',
+    robots: 'index',
+};
+
 // These pages show what is stored in the visitor's own browser, so a crawler would only ever see
 // an empty state. They stay out of the index.
 export const favoritesSeo: PageSeo = {

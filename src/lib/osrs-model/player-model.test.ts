@@ -1,63 +1,61 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { HERO_CHATTER } from './hero-chatter';
-import { parseChat } from './overhead-text';
-import { PlayerModel, SequencePlayer, type PlayerModelData } from './player-model';
+import type { Mesh } from './compose';
+import { PlayerModel, SequencePlayer } from './player-model';
+import type { Framemap } from './types';
 
-const data = JSON.parse(
-    readFileSync(join(import.meta.dir, '..', '..', '..', 'static', 'hero-model', 'player.json'), 'utf8'),
-) as PlayerModelData;
+/** Two vertices, one on skeleton label 1, which a framemap slot moves. */
+function tinyMesh(): Mesh {
+    return {
+        vertexCount: 2,
+        faceCount: 0,
+        vertices: Int32Array.from([0, 0, 0, 100, -50, 0]),
+        labels: Uint8Array.from([0, 1]),
+        faces: new Int32Array(0),
+        colors: new Int32Array(0),
+        priorities: new Uint8Array(0),
+        alphas: new Uint8Array(0),
+        textures: new Int16Array(0),
+        uvs: new Float32Array(0),
+    };
+}
 
-describe('hero model data', () => {
-    test('faces only point at vertices that exist', () => {
-        const vertexCount = data.vertices.length / 3;
-        expect(data.faces.length % 3).toBe(0);
-        expect(data.faces.every((v) => v >= 0 && v < vertexCount)).toBe(true);
-        expect(data.colors.length).toBe(data.faces.length);
-        expect(data.labels.length).toBe(vertexCount);
-    });
-
-    test('every animation frame names a framemap and slots inside it', () => {
-        for (const [name, animation] of Object.entries(data.animations)) {
-            expect(animation.frames.length, name).toBe(animation.lengths.length);
-            for (const frame of animation.frames) {
-                const framemap = data.framemaps[frame[0]];
-                expect(framemap, name).toBeDefined();
-                for (let i = 1; i < frame.length; i += 4) {
-                    expect(frame[i]).toBeLessThan(framemap.types.length);
-                }
-            }
-        }
-    });
-
-    test('every emote the chatter asks for was extracted', () => {
-        for (const line of HERO_CHATTER.flat()) {
-            if (line.emote) expect(data.animations[line.emote], line.emote).toBeDefined();
-        }
-    });
-});
+const framemaps: Record<string, Framemap> = {
+    // slot 0: origin of label 1, slot 1: translate label 1, slot 2: rotate label 1, slot 3: scale label 1
+    7: { types: [0, 1, 2, 3], labels: [[1], [1], [1], [1]] },
+};
 
 describe('PlayerModel', () => {
-    test('posing a frame moves vertices and posing nothing restores the bind pose', () => {
-        const model = new PlayerModel(data);
-        const bind = Array.from(model.y);
-        model.pose(data.animations.cheer.frames[10]);
-        expect(Array.from(model.y)).not.toEqual(bind);
-        model.pose(null);
-        expect(Array.from(model.y)).toEqual(bind);
+    test('translates only the vertices on the moved label', () => {
+        const model = new PlayerModel(tinyMesh(), framemaps);
+        model.pose([7, 1, 10, -5, 3]);
+        expect(Array.from(model.x)).toEqual([0, 110]);
+        expect(Array.from(model.y)).toEqual([0, -55]);
+        expect(Array.from(model.z)).toEqual([0, 3]);
     });
 
-    test('the cheer emote raises the fists past the top of the head', () => {
-        const model = new PlayerModel(data);
-        model.pose(data.animations.idle.frames[0]);
-        const idleTop = Math.min(...model.y);
-        const tops = data.animations.cheer.frames.map((frame) => {
-            model.pose(frame);
-            return Math.min(...model.y);
-        });
-        // y points down, so a higher hand is a smaller y.
-        expect(Math.min(...tops)).toBeLessThan(idleTop);
+    test('posing nothing restores the bind pose', () => {
+        const model = new PlayerModel(tinyMesh(), framemaps);
+        model.pose([7, 1, 10, -5, 3]);
+        model.pose(null);
+        expect(Array.from(model.x)).toEqual([0, 100]);
+        expect(Array.from(model.y)).toEqual([0, -50]);
+    });
+
+    test('rotates a quarter turn about the vertical axis with the game sine table', () => {
+        const model = new PlayerModel(tinyMesh(), framemaps);
+        // Origin at (0, 0, 0) via dx, dy, dz offsets from the label's centre (100, -50, 0).
+        model.pose([7, 0, -100, 50, 0, 2, 0, 64, 0]);
+        // 64 * 8 = 512 of 2048: a quarter turn, which takes +x to -z.
+        expect(model.x[1]).toBe(0);
+        expect(model.z[1]).toBe(-100);
+        expect(model.y[1]).toBe(-50);
+    });
+
+    test('scales about the origin in 128ths', () => {
+        const model = new PlayerModel(tinyMesh(), framemaps);
+        model.pose([7, 0, -100, 50, 0, 3, 256, 128, 64]);
+        expect(model.x[1]).toBe(200);
+        expect(model.y[1]).toBe(-50);
     });
 });
 
@@ -78,21 +76,5 @@ describe('SequencePlayer', () => {
         expect(player.advance(4, false)).toBe(false);
         expect(player.advance(10, false)).toBe(true);
         expect(player.current).toEqual([1]);
-    });
-});
-
-describe('parseChat', () => {
-    test('reads colour and effect prefixes like the chatbox', () => {
-        expect(parseChat('flash1:wave:Free armour trimming!')).toEqual({
-            text: 'Free armour trimming!',
-            colour: 'flash1',
-            effect: 'wave',
-        });
-        expect(parseChat('scroll:hi')).toEqual({ text: 'hi', colour: 'yellow', effect: 'scroll' });
-        expect(parseChat('Buying gf')).toEqual({ text: 'Buying gf', colour: 'yellow', effect: 'none' });
-    });
-
-    test('leaves colons that are not prefixes alone', () => {
-        expect(parseChat('Note: hunter2').text).toBe('Note: hunter2');
     });
 });

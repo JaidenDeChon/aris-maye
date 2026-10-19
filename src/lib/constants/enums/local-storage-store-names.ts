@@ -6,4 +6,5 @@ export enum LocalStorageStoreNames {
     RECENT_SEARCHES_STORE = 'aris-maye-recent-searches',
     ITEMS_PAGE_PREFERENCES = 'aris-maye-items-page-preferences',
     BANK_ITEMS_STORE = 'aris-maye-bank-items',
+    TRANSMOG_OUTFITS_STORE = 'aris-maye-transmog-outfits',
 }

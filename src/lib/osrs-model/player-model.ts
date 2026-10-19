@@ -1,32 +1,12 @@
 /**
- * The player model behind the 3D homepage hero, and the code that poses it.
+ * Poses a composed player mesh (see compose.ts) with the game's own animation data.
  *
- * The data comes from static/hero-model/player.json, which scripts/extract-hero-model.ts builds
- * from the live OSRS cache. Posing follows the client's Model.animate: every frame starts again
- * from the bind pose and applies its transforms in order, using integer maths and the client's
- * 2048-step sine table, so joints creak and snap the way they do in game.
+ * Posing follows the client's Model.animate: every frame starts again from the bind pose and
+ * applies its transforms in order, using integer maths and the client's 2048-step sine table, so
+ * joints creak and snap the way they do in game.
  */
-
-export interface PlayerModelData {
-    source: { archive: string; cache: number; build: number; timestamp: string; kits: number[] };
-    /** x, y, z per vertex. y points down, as it does in the game. */
-    vertices: number[];
-    /** The skeleton label each vertex belongs to. */
-    labels: number[];
-    /** a, b, c vertex indices per face. */
-    faces: number[];
-    /** Three lit HSL colours per face; a third colour of -1 marks a flat-shaded face. */
-    colors: number[];
-    framemaps: Record<string, { types: number[]; labels: number[][] }>;
-    animations: Record<string, Animation>;
-}
-
-export interface Animation {
-    /** Client cycles (20ms) per frame. */
-    lengths: number[];
-    /** [framemap id, slot, dx, dy, dz, slot, dx, dy, dz, ...] per frame. */
-    frames: number[][];
-}
+import type { Mesh } from './compose';
+import type { Animation, Framemap } from './types';
 
 /** The game's sine and cosine tables: 2048 steps to a full turn, scaled by 65536. */
 export const SINE = new Int32Array(2048);
@@ -55,24 +35,26 @@ export class PlayerModel {
     private offsetY = 0;
     private offsetZ = 0;
 
-    constructor(readonly data: PlayerModelData) {
-        this.vertexCount = data.vertices.length / 3;
-        this.faceCount = data.faces.length / 3;
+    constructor(
+        readonly mesh: Mesh,
+        private readonly framemaps: Record<string, Framemap>,
+    ) {
+        this.vertexCount = mesh.vertexCount;
+        this.faceCount = mesh.faceCount;
         this.baseX = new Int32Array(this.vertexCount);
         this.baseY = new Int32Array(this.vertexCount);
         this.baseZ = new Int32Array(this.vertexCount);
         for (let v = 0; v < this.vertexCount; v++) {
-            this.baseX[v] = data.vertices[v * 3];
-            this.baseY[v] = data.vertices[v * 3 + 1];
-            this.baseZ[v] = data.vertices[v * 3 + 2];
+            this.baseX[v] = mesh.vertices[v * 3];
+            this.baseY[v] = mesh.vertices[v * 3 + 1];
+            this.baseZ[v] = mesh.vertices[v * 3 + 2];
         }
         this.x = this.baseX.slice();
         this.y = this.baseY.slice();
         this.z = this.baseZ.slice();
 
-        const maxLabel = Math.max(0, ...data.labels);
-        const buckets: number[][] = Array.from({ length: maxLabel + 1 }, () => []);
-        data.labels.forEach((label, v) => buckets[label].push(v));
+        const buckets: number[][] = Array.from({ length: 256 }, () => []);
+        mesh.labels.forEach((label, v) => buckets[label].push(v));
         this.groups = buckets.map((b) => Int32Array.from(b));
     }
 
@@ -82,7 +64,7 @@ export class PlayerModel {
         this.y.set(this.baseY);
         this.z.set(this.baseZ);
         if (!frame) return;
-        const framemap = this.data.framemaps[frame[0]];
+        const framemap = this.framemaps[frame[0]];
         for (let i = 1; i < frame.length; i += 4) {
             const slot = frame[i];
             this.transform(framemap.types[slot], framemap.labels[slot], frame[i + 1], frame[i + 2], frame[i + 3]);
