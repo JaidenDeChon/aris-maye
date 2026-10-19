@@ -203,7 +203,7 @@
                         disabled={isEmptyOutfit(outfit)}
                         onclick={() => (outfit = { ...EMPTY_OUTFIT, gender: outfit.gender })}
                     >
-                        Take everything off
+                        Remove all items
                     </Button>
                 </div>
 
