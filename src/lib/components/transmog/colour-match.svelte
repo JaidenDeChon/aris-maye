@@ -268,7 +268,7 @@
                 title="Pick a colour"
             >
                 <span class="size-5 rounded-sm border" style:background-color={colourInput}></span>
-                A colour
+                Select colour
                 <input
                     type="color"
                     class="absolute inset-0 cursor-pointer opacity-0"
