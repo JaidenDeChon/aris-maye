@@ -292,9 +292,8 @@
     >
         <h2 id="about-dressing-room" class="font-semibold text-foreground">About the dressing room</h2>
         <p>
-            This OSRS transmog dressing room puts any wearable item in the game on a male or female character, using the
-            game's own models, textures and emotes. Mix pieces from every slot to plan your fashionscape, spin it round,
-            and check what it would cost on the Grand Exchange before you buy.
+            This OSRS transmog dressing room lets you try on any wearable item in the game. Mix pieces from every slot
+            to plan your outfit and check GE prices for your selections.
         </p>
     </section>
 </div>

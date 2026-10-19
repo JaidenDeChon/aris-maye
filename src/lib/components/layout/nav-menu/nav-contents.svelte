@@ -46,7 +46,7 @@
             icon: Sword,
         },
         {
-            title: 'Transmog Dressing Room',
+            title: 'Transmog',
             url: '/transmog-dressing-room',
             icon: Shirt,
         },
