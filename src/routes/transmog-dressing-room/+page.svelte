@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Download, Link, RotateCcw } from 'lucide-svelte';
     import { onMount, untrack } from 'svelte';
     import { toast } from 'svelte-sonner';
     import { replaceState } from '$app/navigation';
@@ -12,12 +13,13 @@
     import TransmogViewer from '$lib/components/transmog/transmog-viewer.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Skeleton } from '$lib/components/ui/skeleton';
+    import * as Tooltip from '$lib/components/ui/tooltip';
     import type { Mesh } from '$lib/osrs-model/compose';
     import type { Texture } from '$lib/osrs-model/rasterizer';
     import type { Gender, WearableItem } from '$lib/osrs-model/types';
     import { canonicalUrl } from '$lib/seo/page-seo';
     import { transmogSeo } from '$lib/seo/static-page-seo';
-    import { buildOutfitMesh, emoteIcon, loadTransmogData, type TransmogData } from '$lib/transmog/data';
+    import { buildOutfitMesh, emoteIcon, loadTransmogData, slotSprite, type TransmogData } from '$lib/transmog/data';
     import {
         EMOTES,
         EMPTY_OUTFIT,
@@ -138,6 +140,12 @@
     // The closing tag is split so it doesn't end this component's own <script> block.
     const structuredDataTag = `<script type="application/ld+json">${structuredData}</` + 'script>';
 
+    const viewerActions = [
+        { label: 'Reset view', icon: RotateCcw, run: () => viewer?.resetView() },
+        { label: 'Download image', icon: Download, run: download },
+        { label: 'Copy link', icon: Link, run: copyLink },
+    ];
+
     const genders: { value: Gender; label: string }[] = [
         { value: 'male', label: 'Male' },
         { value: 'female', label: 'Female' },
@@ -166,7 +174,7 @@
     {:else}
         <!-- Controls on the left and the character on the right; on phones the character comes first. -->
         <div class="grid gap-6 md:grid-cols-[22rem_minmax(0,1fr)]">
-            <div class="min-w-0 md:sticky md:top-20 md:col-start-2 md:row-start-1 md:self-start">
+            <div class="relative min-w-0 md:sticky md:top-20 md:col-start-2 md:row-start-1 md:self-start">
                 <TransmogViewer
                     bind:this={viewer}
                     manifest={transmog.manifest}
@@ -175,17 +183,39 @@
                     idle={idleFor(outfit)}
                     class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[min(40rem,calc(100dvh-6rem))]"
                 />
+                <Tooltip.Provider>
+                    <div class="absolute top-2 right-2 flex gap-1" role="toolbar" aria-label="Outfit actions">
+                        {#each viewerActions as action (action.label)}
+                            <Tooltip.Root>
+                                <Tooltip.Trigger>
+                                    {#snippet child({ props })}
+                                        <Button
+                                            {...props}
+                                            variant="outline"
+                                            class="size-9 bg-background/80 p-0 backdrop-blur"
+                                            aria-label={action.label}
+                                            onclick={action.run}
+                                        >
+                                            <action.icon class="size-4" />
+                                        </Button>
+                                    {/snippet}
+                                </Tooltip.Trigger>
+                                <Tooltip.Content side="bottom">{action.label}</Tooltip.Content>
+                            </Tooltip.Root>
+                        {/each}
+                    </div>
+                </Tooltip.Provider>
             </div>
 
             <div class="flex min-w-0 flex-col gap-4 md:col-start-1 md:row-start-1">
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="flex rounded-md border p-0.5" role="radiogroup" aria-label="Body">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex h-9 rounded-md border p-0.5" role="radiogroup" aria-label="Body">
                         {#each genders as option (option.value)}
                             <button
                                 type="button"
                                 role="radio"
                                 aria-checked={outfit.gender === option.value}
-                                class="rounded px-3 py-1 text-sm transition-colors {outfit.gender === option.value
+                                class="rounded px-3 text-sm transition-colors {outfit.gender === option.value
                                     ? 'bg-primary text-primary-foreground'
                                     : 'text-muted-foreground hover:text-foreground'}"
                                 onclick={() => setGender(option.value)}
@@ -194,16 +224,19 @@
                             </button>
                         {/each}
                     </div>
-                    <Button variant="outline" size="sm" onclick={() => viewer?.resetView()}>Reset view</Button>
-                    <Button variant="outline" size="sm" onclick={download}>Download image</Button>
-                    <Button variant="outline" size="sm" onclick={copyLink}>Copy link</Button>
                     <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
+                        class="gap-1.5 px-2.5"
                         disabled={isEmptyOutfit(outfit)}
                         onclick={() => (outfit = { ...EMPTY_OUTFIT, gender: outfit.gender })}
                     >
-                        Remove all items
+                        <img
+                            src={slotSprite('removeAll')}
+                            alt=""
+                            class="h-[22px] w-[29px] [image-rendering:pixelated]"
+                        />
+                        Remove all
                     </Button>
                 </div>
 

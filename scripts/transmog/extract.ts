@@ -80,6 +80,8 @@ const UI_SPRITES: Record<string, number> = {
     feet: 165,
     ammo: 166,
     tile: 170,
+    /** The bank's "deposit worn items" button, used for taking everything off. */
+    removeAll: 1042,
 };
 
 /** Emote tab icons (the unlocked versions), keyed like ANIMATIONS. */
