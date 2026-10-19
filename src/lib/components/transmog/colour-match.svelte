@@ -4,6 +4,7 @@
      * scape.fashion's colour matching, and puts them on with a click.
      */
     import { untrack } from 'svelte';
+    import WithTooltip from '$lib/components/transmog/with-tooltip.svelte';
     import { itemIconPath } from '$lib/constants/calculators';
     import type { WearableItem } from '$lib/osrs-model/types';
     import { itemMainColour, slotSprite } from '$lib/transmog/data';
@@ -234,26 +235,30 @@
         <span class="text-xs text-muted-foreground">Match the colours of</span>
         <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Match the colours of">
             {#each worn as item (item.id)}
-                <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isSource(item)}
-                    aria-label={item.name}
-                    title={item.name}
-                    class="flex size-10 items-center justify-center rounded-md border bg-muted/30 hover:border-primary/60 {isSource(
-                        item,
-                    )
-                        ? 'border-primary ring-1 ring-primary'
-                        : ''}"
-                    onclick={() => (picked = { kind: 'item', id: item.id })}
-                >
-                    <img
-                        src={missingIcons[item.id] ? slotSprite(slotKey(item.slot)) : itemIconPath(item.id)}
-                        alt=""
-                        class="max-h-8 max-w-8 [image-rendering:pixelated]"
-                        onerror={() => (missingIcons = { ...missingIcons, [item.id]: true })}
-                    />
-                </button>
+                <WithTooltip label={item.name}>
+                    {#snippet children(props)}
+                        <button
+                            {...props}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSource(item)}
+                            aria-label={item.name}
+                            class="flex size-10 items-center justify-center rounded-md border bg-muted/30 hover:border-primary/60 {isSource(
+                                item,
+                            )
+                                ? 'border-primary ring-1 ring-primary'
+                                : ''}"
+                            onclick={() => (picked = { kind: 'item', id: item.id })}
+                        >
+                            <img
+                                src={missingIcons[item.id] ? slotSprite(slotKey(item.slot)) : itemIconPath(item.id)}
+                                alt=""
+                                class="max-h-8 max-w-8 [image-rendering:pixelated]"
+                                onerror={() => (missingIcons = { ...missingIcons, [item.id]: true })}
+                            />
+                        </button>
+                    {/snippet}
+                </WithTooltip>
             {/each}
             <label
                 class="relative flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-muted/30 px-2.5 text-sm hover:border-primary/60 {choice?.kind ===
@@ -283,17 +288,21 @@
             <span>{sourceItem ? sourceItem.name : 'Colour'}</span>
             <div class="flex gap-1">
                 {#each swatches as hex, i (i)}
-                    <button
-                        type="button"
-                        class="size-5 rounded-sm border hover:ring-2 hover:ring-primary"
-                        style:background-color={hex}
-                        aria-label="Match just {hex}"
-                        title="Match just this colour"
-                        onclick={() => {
-                            colourInput = hex;
-                            picked = { kind: 'colour', hex };
-                        }}
-                    ></button>
+                    <WithTooltip label="Match just this colour">
+                        {#snippet children(props)}
+                            <button
+                                {...props}
+                                type="button"
+                                class="size-5 rounded-sm border hover:ring-2 hover:ring-primary"
+                                style:background-color={hex}
+                                aria-label="Match just {hex}"
+                                onclick={() => {
+                                    colourInput = hex;
+                                    picked = { kind: 'colour', hex };
+                                }}
+                            ></button>
+                        {/snippet}
+                    </WithTooltip>
                 {/each}
             </div>
         </div>

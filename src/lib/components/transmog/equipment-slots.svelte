@@ -4,6 +4,7 @@
      * equipped. `grid` lays them out as in game; `strip` puts the visible slots in one scrolling row
      * for small screens.
      */
+    import WithTooltip from '$lib/components/transmog/with-tooltip.svelte';
     import { itemIconPath } from '$lib/constants/calculators';
     import type { WearableItem } from '$lib/osrs-model/types';
     import { slotSprite } from '$lib/transmog/data';
@@ -42,39 +43,43 @@
     {#each shown as slot (slot.id)}
         {@const id = outfit.equipment[slot.id]}
         {@const item = id === undefined ? undefined : items.get(id)}
-        <button
-            type="button"
-            class="relative size-12 shrink-0 rounded-sm bg-cover outline-none transition [image-rendering:pixelated] focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50
-                {selected === slot.id ? 'ring-2 ring-primary' : 'hover:brightness-125'}"
-            style:grid-row={layout === 'grid' ? slot.row : undefined}
-            style:grid-column={layout === 'grid' ? slot.column : undefined}
-            style:background-image="url({slotSprite('tile')})"
-            disabled={!slot.visible}
-            aria-pressed={selected === slot.id}
-            aria-label={label(slot)}
-            title={label(slot)}
-            onclick={() => onselect(selected === slot.id ? null : slot.id)}
-        >
-            {#if item && !missingIcons[item.id]}
-                <img
-                    src={itemIconPath(item.id)}
-                    alt=""
-                    class="absolute inset-0 m-auto max-h-9 max-w-9 [image-rendering:pixelated]"
-                    onerror={() => (missingIcons = { ...missingIcons, [item.id]: true })}
-                />
-            {:else if item}
-                <span
-                    class="absolute inset-0.5 flex items-center justify-center overflow-hidden text-center text-[0.55rem] leading-tight text-white"
+        <WithTooltip label={label(slot)}>
+            {#snippet children(props)}
+                <button
+                    {...props}
+                    type="button"
+                    class="relative size-12 shrink-0 rounded-sm bg-cover outline-none transition [image-rendering:pixelated] focus-visible:ring-2 focus-visible:ring-primary aria-disabled:cursor-not-allowed aria-disabled:opacity-50
+                        {selected === slot.id ? 'ring-2 ring-primary' : 'hover:brightness-125'}"
+                    style:grid-row={layout === 'grid' ? slot.row : undefined}
+                    style:grid-column={layout === 'grid' ? slot.column : undefined}
+                    style:background-image="url({slotSprite('tile')})"
+                    aria-disabled={!slot.visible}
+                    aria-pressed={selected === slot.id}
+                    aria-label={label(slot)}
+                    onclick={() => slot.visible && onselect(selected === slot.id ? null : slot.id)}
                 >
-                    {item.name}
-                </span>
-            {:else}
-                <img
-                    src={slotSprite(slot.key)}
-                    alt=""
-                    class="absolute inset-0 m-auto size-9 opacity-80 [image-rendering:pixelated]"
-                />
-            {/if}
-        </button>
+                    {#if item && !missingIcons[item.id]}
+                        <img
+                            src={itemIconPath(item.id)}
+                            alt=""
+                            class="absolute inset-0 m-auto max-h-9 max-w-9 [image-rendering:pixelated]"
+                            onerror={() => (missingIcons = { ...missingIcons, [item.id]: true })}
+                        />
+                    {:else if item}
+                        <span
+                            class="absolute inset-0.5 flex items-center justify-center overflow-hidden text-center text-[0.55rem] leading-tight text-white"
+                        >
+                            {item.name}
+                        </span>
+                    {:else}
+                        <img
+                            src={slotSprite(slot.key)}
+                            alt=""
+                            class="absolute inset-0 m-auto size-9 opacity-80 [image-rendering:pixelated]"
+                        />
+                    {/if}
+                </button>
+            {/snippet}
+        </WithTooltip>
     {/each}
 </div>

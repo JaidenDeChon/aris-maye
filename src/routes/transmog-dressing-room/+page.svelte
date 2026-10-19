@@ -7,6 +7,7 @@
     import SeoHead from '$lib/components/global/seo-head.svelte';
     import GuideHeader from '$lib/components/guides/guide-header.svelte';
     import ColourMatch from '$lib/components/transmog/colour-match.svelte';
+    import WithTooltip from '$lib/components/transmog/with-tooltip.svelte';
     import EquipmentSlots from '$lib/components/transmog/equipment-slots.svelte';
     import ItemPicker from '$lib/components/transmog/item-picker.svelte';
     import OutfitCost from '$lib/components/transmog/outfit-cost.svelte';
@@ -14,7 +15,6 @@
     import TransmogViewer from '$lib/components/transmog/transmog-viewer.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Skeleton } from '$lib/components/ui/skeleton';
-    import * as Tooltip from '$lib/components/ui/tooltip';
     import type { Mesh } from '$lib/osrs-model/compose';
     import type { Texture } from '$lib/osrs-model/rasterizer';
     import type { Gender, WearableItem } from '$lib/osrs-model/types';
@@ -190,28 +190,23 @@
                     idle={idleFor(outfit)}
                     class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[min(40rem,calc(100dvh-6rem))]"
                 />
-                <Tooltip.Provider>
-                    <div class="absolute top-2 right-2 flex gap-1" role="toolbar" aria-label="Outfit actions">
-                        {#each viewerActions as action (action.label)}
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    {#snippet child({ props })}
-                                        <Button
-                                            {...props}
-                                            variant="outline"
-                                            class="size-9 bg-background/80 p-0 backdrop-blur"
-                                            aria-label={action.label}
-                                            onclick={action.run}
-                                        >
-                                            <action.icon class="size-4" />
-                                        </Button>
-                                    {/snippet}
-                                </Tooltip.Trigger>
-                                <Tooltip.Content side="bottom">{action.label}</Tooltip.Content>
-                            </Tooltip.Root>
-                        {/each}
-                    </div>
-                </Tooltip.Provider>
+                <div class="absolute top-2 right-2 flex gap-1" role="toolbar" aria-label="Outfit actions">
+                    {#each viewerActions as action (action.label)}
+                        <WithTooltip label={action.label} side="bottom">
+                            {#snippet children(props)}
+                                <Button
+                                    {...props}
+                                    variant="outline"
+                                    class="size-9 bg-background/80 p-0 backdrop-blur"
+                                    aria-label={action.label}
+                                    onclick={action.run}
+                                >
+                                    <action.icon class="size-4" />
+                                </Button>
+                            {/snippet}
+                        </WithTooltip>
+                    {/each}
+                </div>
             </div>
 
             <div class="flex min-w-0 flex-col gap-4 md:col-start-1 md:row-start-1">
@@ -325,21 +320,25 @@
                     <h2 id="emotes-heading" class="text-sm font-semibold">Emotes</h2>
                     <div class="grid grid-cols-6 gap-1">
                         {#each EMOTES as emote (emote.key)}
-                            <button
-                                type="button"
-                                class="flex aspect-square items-center justify-center rounded-sm border bg-muted/30 hover:border-primary/60 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                                aria-label={emote.label}
-                                title={emote.label}
-                                onclick={() => viewer?.playEmote(emote.key)}
-                            >
-                                <img
-                                    src={emoteIcon(emote.key)}
-                                    alt=""
-                                    width="48"
-                                    height="48"
-                                    class="size-12 [image-rendering:pixelated]"
-                                />
-                            </button>
+                            <WithTooltip label={emote.label}>
+                                {#snippet children(props)}
+                                    <button
+                                        {...props}
+                                        type="button"
+                                        class="flex aspect-square items-center justify-center rounded-sm border bg-muted/30 hover:border-primary/60 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                                        aria-label={emote.label}
+                                        onclick={() => viewer?.playEmote(emote.key)}
+                                    >
+                                        <img
+                                            src={emoteIcon(emote.key)}
+                                            alt=""
+                                            width="48"
+                                            height="48"
+                                            class="size-12 [image-rendering:pixelated]"
+                                        />
+                                    </button>
+                                {/snippet}
+                            </WithTooltip>
                         {/each}
                     </div>
                 </section>
