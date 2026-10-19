@@ -390,14 +390,4 @@
             {/if}
         {/if}
     </ul>
-
-    <p class="text-xs text-muted-foreground">
-        Colour matches from
-        <a
-            href="https://scape.fashion"
-            class="underline underline-offset-2 hover:text-foreground"
-            rel="noopener noreferrer"
-            target="_blank">scape.fashion</a
-        >.
-    </p>
 </div>

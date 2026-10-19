@@ -276,16 +276,18 @@
                         onselect={(slot) => (selectedSlot = slot)}
                     />
                 </div>
-                <div class="flex flex-col gap-3">
-                    <div class="grid grid-cols-2 rounded-md border p-0.5" role="tablist" aria-label="Find items">
+                <!-- The tabs sit on top of the panel they switch, so it's clear what they change. -->
+                <div class="overflow-hidden rounded-md border">
+                    <div class="grid grid-cols-2 border-b bg-muted/40" role="tablist" aria-label="Find items">
                         {#each finders as finder (finder.value)}
                             <button
                                 type="button"
                                 role="tab"
                                 aria-selected={finderMode === finder.value}
-                                class="flex h-8 items-center justify-center gap-1.5 rounded text-sm transition-colors {finderMode ===
+                                aria-controls="finder-panel"
+                                class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {finderMode ===
                                 finder.value
-                                    ? 'bg-muted text-foreground'
+                                    ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
                                     : 'text-muted-foreground hover:text-foreground'}"
                                 onclick={() => (finderMode = finder.value)}
                             >
@@ -294,26 +296,28 @@
                             </button>
                         {/each}
                     </div>
-                    {#if finderMode === 'search'}
-                        <ItemPicker
-                            itemList={transmog.itemList}
-                            {outfit}
-                            slot={selectedSlot}
-                            onpick={pick}
-                            onremove={(slot) => (outfit = unequip(outfit, slot))}
-                            onclearslot={() => (selectedSlot = null)}
-                        />
-                    {:else}
-                        <ColourMatch
-                            itemList={transmog.itemList}
-                            items={transmog.items}
-                            {outfit}
-                            slot={selectedSlot}
-                            onpick={pick}
-                            onremove={(slot) => (outfit = unequip(outfit, slot))}
-                            onclearslot={() => (selectedSlot = null)}
-                        />
-                    {/if}
+                    <div id="finder-panel" role="tabpanel" class="p-3">
+                        {#if finderMode === 'search'}
+                            <ItemPicker
+                                itemList={transmog.itemList}
+                                {outfit}
+                                slot={selectedSlot}
+                                onpick={pick}
+                                onremove={(slot) => (outfit = unequip(outfit, slot))}
+                                onclearslot={() => (selectedSlot = null)}
+                            />
+                        {:else}
+                            <ColourMatch
+                                itemList={transmog.itemList}
+                                items={transmog.items}
+                                {outfit}
+                                slot={selectedSlot}
+                                onpick={pick}
+                                onremove={(slot) => (outfit = unequip(outfit, slot))}
+                                onclearslot={() => (selectedSlot = null)}
+                            />
+                        {/if}
+                    </div>
                 </div>
 
                 <section aria-labelledby="emotes-heading" class="hidden flex-col gap-1.5 md:flex">
@@ -353,17 +357,6 @@
                 onload={(saved) => transmog && (outfit = validateOutfit(saved, transmog.items))}
             />
         </div>
-
-        <p class="text-xs text-muted-foreground">
-            Models, textures and emotes come straight from the game's files (build {transmog.manifest.source.build ||
-                '?'}), via the
-            <a
-                href="https://archive.openrs2.org"
-                class="underline underline-offset-2 hover:text-foreground"
-                rel="noopener noreferrer"
-                target="_blank">OpenRS2 Archive</a
-            >. Weapons are held in the standard stance for now.
-        </p>
     {/if}
 
     <section
@@ -373,7 +366,32 @@
         <h2 id="about-dressing-room" class="font-semibold text-foreground">About the dressing room</h2>
         <p>
             This OSRS transmog dressing room lets you try on any wearable item in the game. Mix pieces from every slot
-            to plan your outfit and check GE prices for your selections.
+            to plan your outfit and check GE prices for your selections. Weapons are held in the standard stance for
+            now.
         </p>
     </section>
+
+    <footer class="flex max-w-prose flex-col gap-1.5 border-t pt-4 text-xs text-muted-foreground">
+        <p>
+            Models, textures and emotes come from the game's own files{transmog?.manifest.source.build
+                ? ` (build ${transmog.manifest.source.build})`
+                : ''}, via the
+            <a
+                href="https://archive.openrs2.org"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">OpenRS2 Archive</a
+            >. Colour matches come from
+            <a
+                href="https://scape.fashion"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">scape.fashion</a
+            >'s API.
+        </p>
+        <p>
+            Old School RuneScape and its content belong to Jagex Ltd. This site isn't made or endorsed by Jagex, OpenRS2
+            or scape.fashion.
+        </p>
+    </footer>
 </div>
