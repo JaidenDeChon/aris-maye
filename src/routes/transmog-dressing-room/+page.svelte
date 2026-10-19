@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { Download, Link, RotateCcw } from 'lucide-svelte';
+    import { Download, Link, Palette, RotateCcw, Search } from 'lucide-svelte';
     import { onMount, untrack } from 'svelte';
     import { toast } from 'svelte-sonner';
     import { replaceState } from '$app/navigation';
     import { page } from '$app/state';
     import SeoHead from '$lib/components/global/seo-head.svelte';
     import GuideHeader from '$lib/components/guides/guide-header.svelte';
+    import ColourMatch from '$lib/components/transmog/colour-match.svelte';
     import EquipmentSlots from '$lib/components/transmog/equipment-slots.svelte';
     import ItemPicker from '$lib/components/transmog/item-picker.svelte';
     import OutfitCost from '$lib/components/transmog/outfit-cost.svelte';
@@ -146,6 +147,12 @@
         { label: 'Copy link', icon: Link, run: copyLink },
     ];
 
+    const finders = [
+        { value: 'search', label: 'Search', icon: Search },
+        { value: 'match', label: 'Match colours', icon: Palette },
+    ] as const;
+    let finderMode = $state<(typeof finders)[number]['value']>('search');
+
     const genders: { value: Gender; label: string }[] = [
         { value: 'male', label: 'Male' },
         { value: 'female', label: 'Female' },
@@ -274,14 +281,45 @@
                         onselect={(slot) => (selectedSlot = slot)}
                     />
                 </div>
-                <ItemPicker
-                    itemList={transmog.itemList}
-                    {outfit}
-                    slot={selectedSlot}
-                    onpick={pick}
-                    onremove={(slot) => (outfit = unequip(outfit, slot))}
-                    onclearslot={() => (selectedSlot = null)}
-                />
+                <div class="flex flex-col gap-3">
+                    <div class="grid grid-cols-2 rounded-md border p-0.5" role="tablist" aria-label="Find items">
+                        {#each finders as finder (finder.value)}
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={finderMode === finder.value}
+                                class="flex h-8 items-center justify-center gap-1.5 rounded text-sm transition-colors {finderMode ===
+                                finder.value
+                                    ? 'bg-muted text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'}"
+                                onclick={() => (finderMode = finder.value)}
+                            >
+                                <finder.icon class="size-4" />
+                                {finder.label}
+                            </button>
+                        {/each}
+                    </div>
+                    {#if finderMode === 'search'}
+                        <ItemPicker
+                            itemList={transmog.itemList}
+                            {outfit}
+                            slot={selectedSlot}
+                            onpick={pick}
+                            onremove={(slot) => (outfit = unequip(outfit, slot))}
+                            onclearslot={() => (selectedSlot = null)}
+                        />
+                    {:else}
+                        <ColourMatch
+                            itemList={transmog.itemList}
+                            items={transmog.items}
+                            {outfit}
+                            slot={selectedSlot}
+                            onpick={pick}
+                            onremove={(slot) => (outfit = unequip(outfit, slot))}
+                            onclearslot={() => (selectedSlot = null)}
+                        />
+                    {/if}
+                </div>
 
                 <section aria-labelledby="emotes-heading" class="hidden flex-col gap-1.5 md:flex">
                     <h2 id="emotes-heading" class="text-sm font-semibold">Emotes</h2>

@@ -3,15 +3,17 @@
  * models and textures as outfits need them, each fetched only once per visit.
  */
 import { composeOutfit, modelsForOutfit, type Mesh } from '$lib/osrs-model/compose';
-import { prepareTexture, type Texture } from '$lib/osrs-model/rasterizer';
+import { createPalette, prepareTexture, type Texture } from '$lib/osrs-model/rasterizer';
 import {
     TRANSMOG_DATA_VERSION,
     unpackItem,
     type ModelFile,
     type PackedItem,
     type TransmogManifest,
+    type Gender,
     type WearableItem,
 } from '$lib/osrs-model/types';
+import { mainColour, toHex } from './colour';
 import type { Outfit } from './outfit';
 
 const BASE = '/transmog';
@@ -98,6 +100,16 @@ export async function buildOutfitMesh(
         if (texture) textureMap.set(id, texture);
     });
     return { mesh, textures: textureMap };
+}
+
+let palette: Uint32Array | null = null;
+
+/** An item's main colour as #rrggbb, from its model, or null if it has no plain-coloured faces. */
+export async function itemMainColour(item: WearableItem, gender: Gender): Promise<string | null> {
+    const files = await Promise.all(item.models[gender].map(loadModel));
+    palette ??= createPalette(BRIGHTNESS);
+    const rgb = mainColour(files, item.recolor, palette);
+    return rgb === null ? null : toHex(rgb);
 }
 
 /** The game's empty-slot outline (or `tile`, the stone square behind every slot). */
