@@ -21,8 +21,13 @@
 
     const { manifest, mesh, textures, idle, class: className = '' }: Props = $props();
 
-    /** Screen pixels per rendered pixel. */
-    const SCALE = 2;
+    /**
+     * Vertices snap to a grid this many CSS pixels apart, so joints still pop between positions
+     * the way they do in game, while the faces themselves are drawn at the screen's full resolution.
+     */
+    const SNAP_CSS_PX = 2;
+    /** Beyond this, extra device pixels cost frame time without looking any different. */
+    const MAX_PIXEL_RATIO = 2;
     /** Starting turn: a little toward the controls, as the game's character designer shows you. */
     const START_YAW = 1848;
     /** 2048ths of a turn per screen pixel dragged, and per arrow-key press. */
@@ -83,8 +88,8 @@
         dirty = true;
     }
 
-    /** The current frame as a PNG with a transparent background, enlarged without smoothing. */
-    export async function snapshot(scale = 4): Promise<Blob | null> {
+    /** The current frame as a PNG with a transparent background, cropped to the player. */
+    export async function snapshot(): Promise<Blob | null> {
         if (!rasterizer || !model) return null;
         const { width, height } = rasterizer;
         // Crop to the player, with a little room around them.
@@ -112,25 +117,26 @@
         source.height = height;
         source.getContext('2d')!.putImageData(rasterizer.image, 0, 0);
         const out = document.createElement('canvas');
-        out.width = (maxX - minX + 1) * scale;
-        out.height = (maxY - minY + 1) * scale;
-        const ctx = out.getContext('2d')!;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(source, minX, minY, maxX - minX + 1, maxY - minY + 1, 0, 0, out.width, out.height);
+        out.width = maxX - minX + 1;
+        out.height = maxY - minY + 1;
+        out.getContext('2d')!.drawImage(source, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
         return new Promise((resolve) => out.toBlob(resolve, 'image/png'));
     }
 
     function resize(): void {
         if (!container || !canvas) return;
-        const width = Math.max(64, Math.floor(container.clientWidth / SCALE));
-        const height = Math.max(64, Math.floor(container.clientHeight / SCALE));
+        const ratio = Math.min(MAX_PIXEL_RATIO, Math.max(1, window.devicePixelRatio || 1));
+        const cssWidth = container.clientWidth;
+        const cssHeight = container.clientHeight;
+        const width = Math.max(64, Math.round(cssWidth * ratio));
+        const height = Math.max(64, Math.round(cssHeight * ratio));
         if (rasterizer && rasterizer.width === width && rasterizer.height === height) return;
         canvas.width = width;
         canvas.height = height;
-        // Size the canvas to a whole multiple so every rendered pixel is the same size on screen.
-        canvas.style.width = `${width * SCALE}px`;
-        canvas.style.height = `${height * SCALE}px`;
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
         rasterizer = new Rasterizer(width, height, palette, textures);
+        rasterizer.snap = Math.max(1, Math.round(SNAP_CSS_PX * ratio));
         dirty = true;
     }
 
@@ -240,7 +246,7 @@
     <canvas
         bind:this={canvas}
         aria-hidden="true"
-        class="cursor-grab touch-pan-y [image-rendering:pixelated] active:cursor-grabbing"
+        class="cursor-grab touch-pan-y active:cursor-grabbing"
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}

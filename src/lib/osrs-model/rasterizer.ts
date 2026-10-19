@@ -2,8 +2,8 @@
  * A small software renderer that draws a posed player the way the OSRS client's Rasterizer3D does:
  * vertices are rotated with integer maths and projected to whole pixels, faces are ordered by the
  * client's priority-and-distance scheme rather than a depth buffer, and each face's lightness is
- * blended across it through the game's 65,536-colour HSL palette. Drawing at a low resolution and
- * scaling the canvas up without smoothing gives the wobbling, snapping edges of the real thing.
+ * blended across it through the game's 65,536-colour HSL palette. Faces are filled at full
+ * resolution, but vertices can be snapped to a coarser grid (`snap`) to keep the game's wobble.
  */
 import { COSINE, SINE, type PlayerModel } from './player-model';
 
@@ -191,6 +191,11 @@ export class Rasterizer {
     bottom = 0;
     /** Client cycle, for scrolling animated textures. */
     cycle = 0;
+    /**
+     * Grid, in pixels, that projected vertices are snapped to. At 1 they land on whole pixels as in
+     * the game; larger values keep the game's jittery joints when drawing at high resolution.
+     */
+    snap = 1;
 
     constructor(
         readonly width: number,
@@ -242,8 +247,10 @@ export class Rasterizer {
             const depthZ = ((y * sinPitch + rz * cosPitch) >> 16) + camera.distance;
             depth[v] = depthZ;
             // Integer division, so every vertex lands on a whole pixel.
-            screenX[v] = camera.centerX + Math.trunc((rx * camera.zoom) / depthZ);
-            screenY[v] = camera.centerY + Math.trunc((ry * camera.zoom) / depthZ);
+            const sx = Math.trunc((rx * camera.zoom) / depthZ);
+            const sy = Math.trunc((ry * camera.zoom) / depthZ);
+            screenX[v] = camera.centerX + (this.snap > 1 ? Math.round(sx / this.snap) * this.snap : sx);
+            screenY[v] = camera.centerY + (this.snap > 1 ? Math.round(sy / this.snap) * this.snap : sy);
             if (screenY[v] < top) top = screenY[v];
             if (screenY[v] > bottom) bottom = screenY[v];
         }
