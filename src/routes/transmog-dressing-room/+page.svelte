@@ -15,6 +15,7 @@
     import type { Mesh } from '$lib/osrs-model/compose';
     import type { Texture } from '$lib/osrs-model/rasterizer';
     import type { Gender, WearableItem } from '$lib/osrs-model/types';
+    import { canonicalUrl } from '$lib/seo/page-seo';
     import { transmogSeo } from '$lib/seo/static-page-seo';
     import { buildOutfitMesh, loadTransmogData, type TransmogData } from '$lib/transmog/data';
     import {
@@ -121,6 +122,22 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
+    /** Tells search engines what the page is, under the names people search for. `<` is escaped so the JSON can't close the script tag. */
+    const structuredData = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'OSRS Transmog Dressing Room',
+        alternateName: ['OSRS transmog', 'OSRS dressing room', 'OSRS fashionscape planner'],
+        description: transmogSeo.description,
+        url: canonicalUrl(transmogSeo.canonicalPath),
+        applicationCategory: 'GameApplication',
+        operatingSystem: 'Any',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    }).replaceAll('<', '\\u003c');
+    // The closing tag is split so it doesn't end this component's own <script> block.
+    const structuredDataTag = `<script type="application/ld+json">${structuredData}</` + 'script>';
+
     const genders: { value: Gender; label: string }[] = [
         { value: 'male', label: 'Male' },
         { value: 'female', label: 'Female' },
@@ -128,12 +145,14 @@
 </script>
 
 <SeoHead seo={transmogSeo} />
+<svelte:head>
+    <!-- Built from constants above, with `<` escaped, so it's safe to inline. -->
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+    {@html structuredDataTag}
+</svelte:head>
 
 <div class="content-sizing flex flex-col gap-6 pt-6 pb-10">
-    <GuideHeader
-        title="Transmog"
-        answer="Try on any outfit in the game, in 3D. Then share it, save it, or see what it costs."
-    />
+    <GuideHeader title="Transmog Dressing Room" answer="Try on anything in OSRS" />
 
     {#if loadError}
         <div class="rounded-md border bg-muted/20 p-6 text-sm text-muted-foreground">
@@ -266,4 +285,16 @@
             >. Weapons are held in the standard stance for now.
         </p>
     {/if}
+
+    <section
+        class="flex max-w-prose flex-col gap-2 text-sm text-muted-foreground"
+        aria-labelledby="about-dressing-room"
+    >
+        <h2 id="about-dressing-room" class="font-semibold text-foreground">About the dressing room</h2>
+        <p>
+            This OSRS transmog dressing room puts any wearable item in the game on a male or female character, using the
+            game's own models, textures and emotes. Mix pieces from every slot to plan your fashionscape, spin it round,
+            and check what it would cost on the Grand Exchange before you buy.
+        </p>
+    </section>
 </div>

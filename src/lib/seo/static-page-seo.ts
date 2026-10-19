@@ -27,10 +27,10 @@ export function buildSkillSeo(skill: SkillTreePage): PageSeo {
 }
 
 export const transmogSeo: PageSeo = {
-    title: 'OSRS Transmog: Try On Any Outfit in 3D',
+    title: 'OSRS Transmog Dressing Room: Try On Any Outfit in 3D',
     description:
-        "Try on any wearable OSRS item in 3D, drawn from the game's own models. Mix outfits, play emotes, share a link and see the GE cost.",
-    canonicalPath: '/transmog',
+        'The OSRS transmog dressing room: try on any wearable item in 3D, mix outfits, play emotes, then share, save or price your look on the GE.',
+    canonicalPath: '/transmog-dressing-room',
     robots: 'index',
 };
 
