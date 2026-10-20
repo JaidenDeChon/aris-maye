@@ -10,6 +10,7 @@
  * output that already matches the newest cache, otherwise downloads that cache and regenerates,
  * and falls back to the last good output if OpenRS2 can't be reached.
  */
+import { closeGaps } from './close-gaps';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -56,11 +57,12 @@ const CONFIG_SEQUENCE = 12;
 /**
  * Default bodies, as identity kit ids keyed by the equipment slot each one fills
  * (torso 4, arms 6, legs 7, hair 8, hands 9, feet 10, jaw 11). The male is bald and clean-shaven;
- * the female has no bald option, so she gets the first hairstyle.
+ * the female has no bald option, so she gets the first hairstyle. Both need a jaw: the head models
+ * leave the chin and mouth open for it. Kits 14 and 296 are the plain ones, with no facial hair.
  */
 const BODIES = {
     male: { 4: 18, 6: 26, 7: 36, 8: 0, 9: 33, 10: 42, 11: 14 },
-    female: { 4: 56, 6: 61, 7: 70, 8: 45, 9: 67, 10: 79 },
+    female: { 4: 56, 6: 61, 7: 70, 8: 45, 9: 67, 10: 79, 11: 296 },
 } as const;
 
 /** The equipment slots the tool lets you fill. Slot 11 items are minigame team icons. */
@@ -267,6 +269,17 @@ export function extractTransmogData(
             }
         }
         const written = (id: number) => existsSync(join(outDir, 'models', `${id}.json`));
+
+        // Close the small gap where each default head (hair, slot 8) meets its jaw (slot 11).
+        for (const gender of ['male', 'female'] as const) {
+            const [headId] = bodies[gender][8]?.models ?? [];
+            const [jawId] = bodies[gender][11]?.models ?? [];
+            if (headId === undefined || jawId === undefined || !written(headId) || !written(jawId)) continue;
+            const read = (id: number) =>
+                JSON.parse(readFileSync(join(outDir, 'models', `${id}.json`), 'utf8')) as ModelFile;
+            const jaw = closeGaps(read(headId), read(jawId));
+            writeFileSync(join(outDir, 'models', `${jawId}.json`), JSON.stringify(jaw));
+        }
 
         const packed: PackedItem[] = [];
         for (const item of kept) {
