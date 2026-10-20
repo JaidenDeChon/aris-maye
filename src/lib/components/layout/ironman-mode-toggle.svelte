@@ -15,7 +15,7 @@
 </script>
 
 <label
-    class="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-input bg-background/70 px-3 text-sm text-foreground transition-colors hover:bg-muted/55 lg:ml-auto"
+    class="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-input bg-background/70 px-2 text-sm text-foreground transition-colors hover:bg-muted/55 sm:px-3 lg:ml-auto"
     title="Ironman mode: prices from alching and shops only, nothing from the Grand Exchange"
 >
     <img

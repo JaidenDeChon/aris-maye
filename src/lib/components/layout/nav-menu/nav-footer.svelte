@@ -4,9 +4,9 @@
     import * as Tooltip from '$lib/components/ui/tooltip';
     import OsrsboxItemUploadDialog from '$lib/components/dialogs/osrsbox-item-upload-dialog.svelte';
     import { Button, buttonVariants } from '$lib/components/ui/button';
-    import { toggleMode } from 'mode-watcher';
-    import { Moon, Sun, Info } from 'lucide-svelte';
+    import { Info } from 'lucide-svelte';
     import { resolve } from '$app/paths';
+    import FeedbackDialog from './feedback-dialog.svelte';
     import KofiTipDialog from './kofi-tip-dialog.svelte';
 
     const sidebar = Sidebar.useSidebar();
@@ -101,50 +101,13 @@
             </Tooltip.Provider>
         </div>
 
-        <Tooltip.Provider>
-            <Tooltip.Root>
-                <Tooltip.Trigger
-                    class={[
-                        'w-full min-h-10 min-w-10 max-h-10',
-                        buttonVariants({
-                            class: 'p-0 text-foreground border border-input rounded-md bg-background/70 hover:bg-muted/55 transition-colors',
-                        }),
-                    ]}
-                    onclick={toggleMode}
-                >
-                    <div class="flex items-center justify-center gap-2 w-full">
-                        <span class="flex h-5 w-5 items-center justify-center shrink-0 relative">
-                            <Sun class="block transition-opacity dark:hidden" />
-                            <Moon class="block transition-opacity hidden dark:block" />
-                        </span>
-                        <span class="text-sm">Toggle theme</span>
-                    </div>
-                    <span class="sr-only">Toggle theme</span>
-                </Tooltip.Trigger>
-                <Tooltip.Content>
-                    <p>Toggle theme</p>
-                </Tooltip.Content>
-            </Tooltip.Root>
-        </Tooltip.Provider>
+        <FeedbackDialog expanded />
 
         <KofiTipDialog expanded />
     </div>
 {:else if !sidebar.open}
     <div class="flex flex-col items-center gap-2">
-        <Tooltip.Provider>
-            <Tooltip.Root>
-                <Tooltip.Trigger>
-                    <Button variant="outline" class="h-9 w-9" onclick={toggleMode}>
-                        <span class="flex h-5 w-5 items-center justify-center shrink-0 relative">
-                            <Sun class="block transition-opacity dark:hidden" />
-                            <Moon class="block transition-opacity hidden dark:block" />
-                        </span>
-                        <span class="sr-only">Toggle theme</span>
-                    </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content side="right">Toggle theme</Tooltip.Content>
-            </Tooltip.Root>
-        </Tooltip.Provider>
+        <FeedbackDialog expanded={false} />
 
         <KofiTipDialog expanded={false} />
     </div>
