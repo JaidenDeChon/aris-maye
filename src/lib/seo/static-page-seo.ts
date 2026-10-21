@@ -34,6 +34,14 @@ export const transmogSeo: PageSeo = {
     robots: 'index',
 };
 
+export const aboutSeo: PageSeo = {
+    title: 'About Aris Maye',
+    description:
+        'Why Aris Maye exists, what it does for OSRS players, and the sites and projects it gets its data from.',
+    canonicalPath: '/about',
+    robots: 'index',
+};
+
 // These pages show what is stored in the visitor's own browser, so a crawler would only ever see
 // an empty state. They stay out of the index.
 export const favoritesSeo: PageSeo = {

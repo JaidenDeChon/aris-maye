@@ -64,7 +64,7 @@
                             }),
                         ]}
                     >
-                        <a href={resolve('/')} class="h-full w-full flex items-center justify-center">
+                        <a href={resolve('/about')} class="h-full w-full flex items-center justify-center">
                             <Info />
                             <span class="sr-only">About</span>
                         </a>

@@ -33,6 +33,7 @@ export function sitemapUrls(itemIds: number[], base: string = SITE_URL): string[
         ...XP_GUIDE_SKILLS.map((skill) => `/calculators/${skill.slug}`),
         '/calculators/ge-tax',
         '/transmog-dressing-room',
+        '/about',
     ];
     for (const id of itemIds) paths.push(`/items/${id}`);
     return [...new Set(paths.map((path) => canonicalUrl(path, base)))];
