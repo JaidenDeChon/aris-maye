@@ -33,26 +33,9 @@
         seemed I was always too broke to skill efficiently.
     </p>
     <p>
-        Once that first feature was added to this site — once I could sort by what it would be most profitable to make —
-        the ideas started flowing and, at least as of this writing, features are getting added left and right,
-        especially now that I can employ an AI rather than writing all of these functionalities completely by hand
-        (which was still the norm when this project began). Today the site features several helpful tools for players of
-        the game, all available completely for free:
+        The site has grown a lot since those early days, now featuring more detailed analyses of beneficial items, skill
+        calculators, and (what I believe is) the only 3D model-based OSRS dressing room in existence.
     </p>
-    <ul class="flex list-disc flex-col gap-2 pl-6">
-        <li>Most-profitable items to create, driven by live GE prices and filtered based on your own skill levels</li>
-        <li>Price-tracking and overall in-game market analysis</li>
-        <li>
-            Ironman-optimized options (focuses on XP gains and <em>game</em> prices like those from shops and NPCs
-            rather than <em>economy</em> prices)
-        </li>
-        <li>Skill calculators focused on each skill where you’d produce things</li>
-        <li>
-            Transmog dressing room, which lets you put together an in-game outfit and how much it would cost. This lets
-            you see, save, and share these outfits as well as calculate their cost. From what I can find, this is the
-            only tool in existence that lets you demo items on a 3D character model.
-        </li>
-    </ul>
     <p>
         The site is still a work in progress and I plan to keep it free forever. If you appreciate my work and feel like
         supporting development, then thank you! There is a tip button in the website’s sidebar. Please let me know if
