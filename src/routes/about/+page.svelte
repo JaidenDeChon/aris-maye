@@ -19,8 +19,6 @@
         { name: 'Wise Old Man', href: 'https://wiseoldman.net', purpose: 'skill level imports' },
         { name: 'OpenRS2 Archive', href: 'https://archive.openrs2.org', purpose: '3D models for the dressing room' },
         { name: 'scape.fashion', href: 'https://scape.fashion', purpose: 'colour matching in the dressing room' },
-        { name: 'Font Awesome', href: 'https://fontawesome.com', purpose: 'icons' },
-        { name: 'Lucide', href: 'https://lucide.dev', purpose: 'icons' },
     ];
 </script>
 
