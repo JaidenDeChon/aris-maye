@@ -4,7 +4,7 @@
     /** The top of a guide: what it is, the one-line answer, and how fresh the numbers are. */
     interface GuideHeaderProps {
         title: string;
-        answer: string;
+        answer?: string;
         computedAt?: number;
         /** Where the numbers come from, for the line beside the update time. */
         source?: string;
@@ -23,7 +23,9 @@
 
 <header class="flex flex-col gap-2">
     <h1 class="rs-font-with-shadow dark:rs-font text-3xl text-primary text-balance md:text-4xl">{title}</h1>
-    <p class="max-w-prose text-base text-muted-foreground">{answer}</p>
+    {#if answer}
+        <p class="max-w-prose text-base text-muted-foreground">{answer}</p>
+    {/if}
     {#if computedAt}
         <p class="text-xs text-muted-foreground">
             {source} Updated <UpdatedTime {computedAt} />{refreshedHourly ? ', refreshed hourly.' : '.'}

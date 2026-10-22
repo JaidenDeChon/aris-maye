@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { skillTreePages } from '$lib/constants/skill-tree-pages';
 import {
+    aboutSeo,
     addItemSeo,
     buildSkillSeo,
     favoritesSeo,
@@ -17,6 +18,7 @@ describe('static page SEO', () => {
         ['home', homeSeo],
         ['items', itemsSeo],
         ['transmog', transmogSeo],
+        ['about', aboutSeo],
         ...skillTreePages.map((skill) => [skill.slug, buildSkillSeo(skill)] as const),
     ])('%s is indexable and within limits', (_, seo) => {
         expect(seo.robots).toBe('index');
@@ -42,9 +44,16 @@ describe('static page SEO', () => {
     });
 
     it('gives every fixed page a different title', () => {
-        const titles = [homeSeo, itemsSeo, transmogSeo, favoritesSeo, hiddenSeo, myCharacterSeo, addItemSeo].map(
-            (s) => s.title,
-        );
+        const titles = [
+            homeSeo,
+            itemsSeo,
+            transmogSeo,
+            aboutSeo,
+            favoritesSeo,
+            hiddenSeo,
+            myCharacterSeo,
+            addItemSeo,
+        ].map((s) => s.title);
         expect(new Set(titles).size).toBe(titles.length);
     });
 });
