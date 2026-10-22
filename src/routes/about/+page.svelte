@@ -24,13 +24,13 @@
 
 <SeoHead seo={aboutSeo} />
 
-<GuideHeader title="About Aris Maye" answer="Hey, thanks for stopping in!" />
+<GuideHeader title="About Aris Maye" />
 
 <section class="flex max-w-prose flex-col gap-4 text-base">
     <p>
-        This website, originally called GE Skiller, has been a passion project of mine since late 2023. The original
-        idea was to figure out how my OSRS character could make a little more money, as it seemed I was always too broke
-        to skill efficiently.
+        Hey, thanks for stopping in! This website, originally called GE Skiller, has been a passion project of mine
+        since late 2023. The original idea was to figure out how my OSRS character could make a little more money, as it
+        seemed I was always too broke to skill efficiently.
     </p>
     <p>
         Once that first feature was added to this site — once I could sort by what it would be most profitable to make —
