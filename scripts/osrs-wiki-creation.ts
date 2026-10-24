@@ -252,9 +252,7 @@ function buildMethodsFromSwitchInfoboxes(
 
     $switches.each((_, el) => {
         const $switch = $(el);
-        if (
-            options?.ignoreWithinSelectors?.some((selector) => $switch.closest(selector).length > 0)
-        ) {
+        if (options?.ignoreWithinSelectors?.some((selector) => $switch.closest(selector).length > 0)) {
             return;
         }
         const triggerLabels = new Map<string, string>();
@@ -272,7 +270,8 @@ function buildMethodsFromSwitchInfoboxes(
             const $item = $(itemEl);
             const dataId = $item.attr('data-id')?.trim();
             const label = dataId ? triggerLabels.get(dataId) : undefined;
-            const methodName = label && methodNamePrefix ? `${methodNamePrefix}: ${label}` : label ?? methodNamePrefix;
+            const methodName =
+                label && methodNamePrefix ? `${methodNamePrefix}: ${label}` : (label ?? methodNamePrefix);
 
             const captionTables = extractCaptionTables($, $item);
             if (captionTables.length === 0) return;
@@ -298,9 +297,7 @@ function buildMethodsFromRecipeTables(
 
     $recipes.each((_, el) => {
         const $recipe = $(el);
-        if (
-            options?.ignoreWithinSelectors?.some((selector) => $recipe.closest(selector).length > 0)
-        ) {
+        if (options?.ignoreWithinSelectors?.some((selector) => $recipe.closest(selector).length > 0)) {
             return;
         }
 
@@ -314,11 +311,7 @@ function buildMethodsFromRecipeTables(
     return methods;
 }
 
-function buildMethodsFromTabbers(
-    $: cheerio.CheerioAPI,
-    pageTitle: string,
-    scope: cheerio.Cheerio,
-): CreationMethod[] {
+function buildMethodsFromTabbers($: cheerio.CheerioAPI, pageTitle: string, scope: cheerio.Cheerio): CreationMethod[] {
     const methods: CreationMethod[] = [];
 
     const pushTabMethods = ($tab: cheerio.Cheerio, rawMethodName?: string) => {

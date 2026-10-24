@@ -1276,7 +1276,7 @@
 
                     <div class="space-y-4">
                         <div class="flex flex-wrap gap-2">
-                            {#each formData.creationSpecs as spec, tabIndex (spec.id ?? tabIndex)}
+                            {#each formData.creationSpecs, tabIndex (tabIndex)}
                                 <Button
                                     type="button"
                                     size="sm"

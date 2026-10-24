@@ -52,7 +52,7 @@ export const GET: RequestHandler = async ({ url }) => {
             const parsed = JSON.parse(suppliesParam) as PlayerSupplies;
             if (parsed && typeof parsed === 'object') {
                 const entries = Object.entries(parsed)
-                    .map(([id, quantity]) => [String(id), Math.floor(Number(quantity))])
+                    .map(([id, quantity]): [string, number] => [String(id), Math.floor(Number(quantity))])
                     .filter(([, quantity]) => Number.isFinite(quantity) && quantity > 0);
                 if (entries.length) supplies = Object.fromEntries(entries);
             }

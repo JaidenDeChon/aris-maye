@@ -165,7 +165,7 @@ async function run() {
     const ids = Array.from(nodes.keys()).sort();
     const total = limit ? Math.min(limit, ids.length) : ids.length;
     let processed = 0;
-    let batch: Parameters<typeof OsrsboxItemModel.collection.bulkWrite>[0] = [];
+    let batch: mongoose.mongo.AnyBulkWriteOperation[] = [];
 
     for (const id of ids) {
         if (startId && id <= startId) continue;
@@ -176,9 +176,9 @@ async function run() {
         const updatedSpecs = node
             ? node.specs.map((spec, index) => {
                   const range = computeSpecTree(id, index, new Set());
-                  const { treeMaxSkills: _treeMaxSkills, ...rest } = spec as GameItemCreationSpecs & {
-                      treeMaxSkills?: Record<string, number> | null;
-                  };
+                  // Drop the retired treeMaxSkills field so the write clears it.
+                  const rest = { ...spec } as GameItemCreationSpecs & { treeMaxSkills?: Record<string, number> | null };
+                  delete rest.treeMaxSkills;
                   return {
                       ...rest,
                       treeMinSkills: Object.keys(range.min).length ? range.min : null,
@@ -220,10 +220,7 @@ async function run() {
     if (!dryRun) {
         await OsrsboxItemModel.collection.updateMany(
             {
-                $or: [
-                    { creationTreeMinSkills: { $exists: true } },
-                    { creationTreeMaxSkills: { $exists: true } },
-                ],
+                $or: [{ creationTreeMinSkills: { $exists: true } }, { creationTreeMaxSkills: { $exists: true } }],
             },
             {
                 $unset: {
@@ -235,7 +232,9 @@ async function run() {
     }
 
     if (cycles.length) {
-        console.warn(`[creation-tree-skills] Detected ${cycles.length} cycle hits. Consider running find-ingredient-cycles.`);
+        console.warn(
+            `[creation-tree-skills] Detected ${cycles.length} cycle hits. Consider running find-ingredient-cycles.`,
+        );
     }
 
     await mongoose.disconnect();

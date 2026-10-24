@@ -62,9 +62,12 @@
         'data-active': isActive,
         ...restProps,
     });
+
+    // Named here: prettier-plugin-svelte drops the type arguments from an inline snippet annotation.
+    type SnippetProps = Record<string, unknown>;
 </script>
 
-{#snippet Button({ props }: { props?: Record })}
+{#snippet Button({ props }: { props?: SnippetProps })}
     {@const mergedProps = mergeProps(buttonProps, props)}
     {#if child}
         {@render child({ props: mergedProps })}

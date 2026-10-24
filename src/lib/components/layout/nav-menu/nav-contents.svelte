@@ -20,12 +20,14 @@
     import { favoritesStore } from '$lib/stores/favorites-store';
     import { hiddenStore } from '$lib/stores/hidden-store';
     import { resolve } from '$app/paths';
+    import type { Pathname } from '$app/types';
+    import { resolvePathname } from '$lib/helpers/resolve-pathname';
     import { XP_GUIDE_SKILLS, type GuidePath } from '$lib/constants/guides';
     import { skillIcon } from '$lib/helpers/homepage';
 
     interface Item {
         title: string;
-        url: string;
+        url: Pathname;
         // Use if providing an icon with Lucide.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         icon?: any;
@@ -118,7 +120,9 @@
                             {item.title}
                         {/snippet}
                         {#snippet child({ props })}
-                            <a href={resolve(item.url)} {...props}>
+                            <!-- resolvePathname is resolve() with a wider type. -->
+                            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                            <a href={resolvePathname(item.url)} {...props}>
                                 <item.icon />
                                 <span>{item.title}</span>
                                 <span class="ml-auto inline-flex items-center gap-2">
@@ -160,7 +164,9 @@
                             {skill.title}
                         {/snippet}
                         {#snippet child({ props })}
-                            <a href={resolve(skill.url)} {...props}>
+                            <!-- resolvePathname is resolve() with a wider type. -->
+                            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                            <a href={resolvePathname(skill.url)} {...props}>
                                 {#if skill.icon}
                                     <skill.icon />
                                 {:else if skill.iconString}

@@ -54,6 +54,6 @@
 
 <style>
     :global(div[data-dialog-overlay]) {
-        @apply duration-300 !important;
+        transition-duration: 300ms !important;
     }
 </style>

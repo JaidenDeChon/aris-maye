@@ -866,10 +866,7 @@ export async function importCreationForAllItems(options: ImportOptions = {}): Pr
     if (!itemIdLookupMap) {
         logWithProgress('log', '[creation-importer] Building item name lookup map...');
         itemIdLookupMap = await buildItemIdLookupMap();
-        logWithProgress(
-            'log',
-            `[creation-importer] Item lookup map ready (${itemIdLookupMap.size} keys).`,
-        );
+        logWithProgress('log', `[creation-importer] Item lookup map ready (${itemIdLookupMap.size} keys).`);
     }
 
     if (options.skipExisting) {

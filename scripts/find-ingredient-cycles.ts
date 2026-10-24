@@ -71,9 +71,7 @@ async function run() {
 
     await mongoose.connect(connectionString);
 
-    const rawItems = await OsrsboxItemModel.find({}, '_id name wiki_name creationSpecs.ingredients.item')
-        .lean()
-        .exec();
+    const rawItems = await OsrsboxItemModel.find({}, '_id name wiki_name creationSpecs.ingredients.item').lean().exec();
 
     const nodes = new Map<string, Node>();
 
@@ -160,9 +158,7 @@ async function run() {
         cycles.forEach((cycle, index) => {
             logLines.push(`Cycle ${index + 1}:`);
             logLines.push(`Path: ${formatPath(cycle.path, nodes)}`);
-            logLines.push(
-                `Closing edge: ${formatNode(cycle.fromId, nodes)} -> ${formatNode(cycle.toId, nodes)}`,
-            );
+            logLines.push(`Closing edge: ${formatNode(cycle.fromId, nodes)} -> ${formatNode(cycle.toId, nodes)}`);
             logLines.push('');
         });
         if (cycles.length >= limit) {

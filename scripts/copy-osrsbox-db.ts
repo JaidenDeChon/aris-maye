@@ -108,7 +108,9 @@ async function main() {
                     .toArray();
             });
 
-            const indexes = await withRetry(`${collectionName} indexes`, async () => db.collection(collectionName).indexes());
+            const indexes = await withRetry(`${collectionName} indexes`, async () =>
+                db.collection(collectionName).indexes(),
+            );
             const indexSpecs = buildIndexSpecs(indexes);
 
             if (indexSpecs.length > 0) {
