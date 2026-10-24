@@ -70,11 +70,12 @@ function maybeSkipBackfill() {
         return;
     }
 
-    const summary = JSON.parse(fs.readFileSync(osrsboxSummaryPath, 'utf8')) as Record<
-        string,
-        { name?: string }
-    >;
-    const names = new Set(Object.values(summary).map((item) => item.name).filter(Boolean) as string[]);
+    const summary = JSON.parse(fs.readFileSync(osrsboxSummaryPath, 'utf8')) as Record<string, { name?: string }>;
+    const names = new Set(
+        Object.values(summary)
+            .map((item) => item.name)
+            .filter(Boolean) as string[],
+    );
     const missing = targets.filter((name) => !names.has(name));
 
     if (missing.length === 0) {
