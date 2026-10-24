@@ -209,7 +209,7 @@
         </div>
     {:else if !transmog}
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_15rem] xl:grid-cols-[minmax(0,1fr)_18rem_15rem] xl:gap-6"
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:gap-6"
             aria-busy="true"
         >
             <Skeleton class="h-80 md:h-[26rem] {TALL}" />
@@ -223,7 +223,7 @@
             character first.
         -->
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_15rem] xl:grid-cols-[minmax(0,1fr)_18rem_15rem] xl:grid-rows-1 xl:gap-6 {TALL}"
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:grid-rows-1 xl:gap-6 {TALL}"
         >
             <div
                 class="relative h-80 md:col-start-1 md:row-start-1 md:h-auto md:min-h-[26rem] xl:col-start-2 xl:h-full"
