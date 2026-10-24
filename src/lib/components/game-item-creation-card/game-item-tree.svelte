@@ -6,7 +6,7 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import type { ComposeOption, EChartsType } from 'echarts/core';
+    import type { ComposeOption, ECElementEvent, EChartsType } from 'echarts/core';
     import { iconToDataUri } from '$lib/helpers/icon-to-data-uri';
     import type { IngredientTreeNode } from '$lib/components/game-item-creation-card/types';
     import { getPrimaryCreationSpec } from '$lib/helpers/creation-specs';
@@ -64,6 +64,8 @@
     });
     const bankItems = $derived(getSuppliesForCharacter($bankItemsStore, activeCharacterId));
     const suppliesOwned = $derived.by(() => {
+        // Built fresh on each run and never changed afterwards, so it needs no reactivity.
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity
         const owned = new Set<string>();
         for (const entry of bankItems) {
             const id = entry?.id;
@@ -320,7 +322,10 @@
                 padding: 0,
                 extraCssText: 'box-shadow:none;',
                 formatter: (params) => {
-                    const data = (params?.data as TreeDatum | undefined)?.tooltipData;
+                    // trigger: 'item' passes one params object, never the array form.
+                    const data = Array.isArray(params)
+                        ? undefined
+                        : (params.data as TreeDatum | undefined)?.tooltipData;
                     return buildTooltipContent(data, colors);
                 },
             },
@@ -555,7 +560,8 @@
         } catch (error) {
             console.error('Failed to fetch expanded item tree', error);
         } finally {
-            const { [key]: _ignored, ...rest } = expandedItemFetches;
+            const rest = { ...expandedItemFetches };
+            delete rest[key];
             expandedItemFetches = rest;
         }
     }
@@ -566,16 +572,17 @@
         }
     });
 
-    function handleNodeClick(params: { data?: TreeDatum; event?: { event?: MouseEvent } }) {
-        const itemId = params?.data?.itemId;
+    function handleNodeClick(params: ECElementEvent) {
+        const data = params.data as TreeDatum | undefined;
+        const itemId = data?.itemId;
         if (!itemId) return;
 
         const nativeEvent = params?.event?.event;
         const hasModifier = Boolean(
             nativeEvent?.altKey || nativeEvent?.metaKey || nativeEvent?.ctrlKey || nativeEvent?.shiftKey,
         );
-        if (collapseNodesOnClick && params?.data?.hasLazyChildren && params?.data?.nodeKey && !hasModifier) {
-            const key = String(params.data.nodeKey);
+        if (collapseNodesOnClick && data?.hasLazyChildren && data?.nodeKey && !hasModifier) {
+            const key = String(data.nodeKey);
             if (!expandedSupplyNodes[key]) {
                 expandedSupplyNodes = { ...expandedSupplyNodes, [key]: true };
             }
@@ -583,7 +590,7 @@
             return;
         }
 
-        const hasChildren = Array.isArray(params?.data?.children) && params.data.children.length > 0;
+        const hasChildren = Array.isArray(data?.children) && data.children.length > 0;
         if (collapseNodesOnClick && hasChildren) {
             if (hasModifier) {
                 openItemPage(itemId);

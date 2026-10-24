@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types, type PipelineStage } from 'mongoose';
 import { skillTreeSlugs } from '$lib/constants/skill-tree-pages';
 import { MAX_ITEM_TREE_DEPTH, MAX_ITEM_TREE_NODES } from '$lib/constants/item-tree';
 import { OsrsboxItemModel, type OsrsboxItemDocument } from '$lib/models/mongo-schemas/osrsbox-db-item-schema';
@@ -509,7 +509,7 @@ export async function getPaginatedGameItems(params?: {
     // otherwise it can wait until after pagination and run for just the returned page.
     const profitStagesBeforeSort = profitDrivenSort ? profitStages : [];
     const profitStagesAfterPagination = profitDrivenSort ? [] : profitStages;
-    const sortStage = roiSort
+    const sortStage: Record<string, 1 | -1> = roiSort
         ? { creationRoi: sortDirection, creationProfit: -1, highPrice: -1, cost: -1, name: 1 }
         : roiValueSort
           ? { creationProfit: sortDirection, creationRoi: -1, highPrice: -1, cost: -1, name: 1 }
@@ -691,7 +691,7 @@ export function buildProfitPipeline(
     filterMissingRoi: boolean = false,
     ironman: boolean = false,
     natureRunePrice: number = NATURE_RUNE_FALLBACK_PRICE,
-): Record<string, unknown>[] {
+): PipelineStage.FacetPipelineStage[] {
     const supplyMap = supplies ?? normalizeSupplies(supplies);
     const hasSupplies = enforceSupplies || Boolean(supplyMap);
     const primarySpecExpr = buildPrimarySpecExpression();
@@ -888,24 +888,23 @@ export function buildProfitPipeline(
             },
         ],
     };
-    const suppliesSatisfiedExpr = hasSupplies
-        ? {
-              $eq: [
-                  {
-                      $size: {
-                          $filter: {
-                              input: '$ingredientCostRows',
-                              as: 'row',
-                              cond: { $gt: ['$$row.needed', 0] },
-                          },
-                      },
-                  },
-                  0,
-              ],
-          }
-        : true;
+    // Only read when there are supplies to enforce, so it needs no fallback.
+    const suppliesSatisfiedExpr = {
+        $eq: [
+            {
+                $size: {
+                    $filter: {
+                        input: '$ingredientCostRows',
+                        as: 'row',
+                        cond: { $gt: ['$$row.needed', 0] },
+                    },
+                },
+            },
+            0,
+        ],
+    };
 
-    const pipeline: Record<string, unknown>[] = [
+    const pipeline: PipelineStage.FacetPipelineStage[] = [
         { $set: { primarySpec: primarySpecExpr } },
         {
             $set: {
@@ -1055,7 +1054,7 @@ export function buildProfitPipeline(
     return pipeline;
 }
 
-function buildSuppliesFilterPipeline(supplies?: PlayerSupplies | null): Record<string, unknown>[] {
+function buildSuppliesFilterPipeline(supplies?: PlayerSupplies | null): PipelineStage[] {
     const supplyMap = supplies ?? normalizeSupplies(supplies) ?? {};
 
     const primarySpecExpr = buildPrimarySpecExpression();
