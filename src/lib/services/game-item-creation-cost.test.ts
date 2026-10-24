@@ -143,7 +143,8 @@ describeIfMongo('creation cost for untradeable ingredients', () => {
 
         expect(potion).toBeDefined();
         expect(potion!.creationCost).toBe(5);
-        expect(potion!.creationProfit).toBe(495);
+        // 500 less the 2% GE tax (10) and the 5gp fee.
+        expect(potion!.creationProfit).toBe(485);
     });
 
     it('keeps items with an unknown creation cost out of the ROI sort', async () => {
@@ -158,7 +159,8 @@ describeIfMongo('creation cost for untradeable ingredients', () => {
         const sapling = page.items.find((item) => item.name === 'Oak sapling') as Record<string, unknown> | undefined;
 
         expect(sapling!.creationCost).toBe(40);
-        expect(sapling!.creationProfit).toBe(276);
+        // 316 less the 2% GE tax (6) and the 40gp seedling.
+        expect(sapling!.creationProfit).toBe(270);
 
         await OsrsboxItemModel.updateOne({ _id: seedlingObjectId }, { $set: { tradeable_on_ge: false, cost: 1 } });
     });
