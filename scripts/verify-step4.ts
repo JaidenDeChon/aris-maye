@@ -19,11 +19,15 @@ function check(ok: boolean, label: string, detail = '') {
     console.log(`${ok ? '  PASS' : '  FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
 }
 
+/** The parts of a populated ingredient tree that `countNodes` walks. */
+type TreeNode = { creationSpecs?: { ingredients?: TreeIngredient[] }[] | null };
+type TreeIngredient = TreeNode & { item?: TreeNode | null };
+
 /** Counts nodes in a populated ingredient tree. */
-function countNodes(node: any): number {
+function countNodes(node: TreeNode | null | undefined): number {
     if (!node) return 0;
-    const kids = node.creationSpecs?.flatMap((s: any) => s.ingredients ?? []) ?? [];
-    return 1 + kids.reduce((sum: number, k: any) => sum + countNodes(k.item ?? k), 0);
+    const kids = node.creationSpecs?.flatMap((s) => s.ingredients ?? []) ?? [];
+    return 1 + kids.reduce((sum, k) => sum + countNodes(k.item ?? k), 0);
 }
 
 async function main() {
@@ -33,25 +37,34 @@ async function main() {
     console.log('Trees must render:');
     for (const name of MUST_RENDER) {
         const doc = await OsrsboxItemModel.findOne({ name }).select('_id').lean();
-        if (!doc) { check(false, name, 'item not found'); continue; }
+        if (!doc) {
+            check(false, name, 'item not found');
+            continue;
+        }
         const started = Date.now();
         const tree = await populateIngredientsTree(String(doc._id));
-        const nodes = countNodes(tree);
+        const nodes = countNodes(tree as TreeNode | null);
         check(nodes > 1, name, `${nodes} nodes in ${Date.now() - started}ms`);
     }
 
     console.log('\nMust load; drops report no ingredient data:');
     for (const name of MUST_LOAD) {
         const doc = await OsrsboxItemModel.findOne({ name }).select('_id creationSpecs').lean();
-        if (!doc) { check(false, name, 'item not found'); continue; }
-        const specs = (doc as any).creationSpecs?.length ?? 0;
+        if (!doc) {
+            check(false, name, 'item not found');
+            continue;
+        }
+        const specs = doc.creationSpecs?.length ?? 0;
         check(true, name, specs === 0 ? 'no ingredient data (expected for a drop)' : `${specs} spec(s)`);
     }
 
-    for (const [order, label] of [['roi-desc', 'ROI (percentage)'], ['roi-value-desc', 'ROI (value)']] as const) {
+    for (const [order, label] of [
+        ['roi-desc', 'ROI (percentage)'],
+        ['roi-value-desc', 'ROI (value)'],
+    ] as const) {
         console.log(`\n${label} — top 15:`);
-        const page = await getPaginatedGameItems({ page: 1, perPage: 15, sortOrder: order as any });
-        const names = page.items.map((i: any) => i.name);
+        const page = await getPaginatedGameItems({ page: 1, perPage: 15, sortOrder: order });
+        const names = page.items.map((i) => i.name);
         names.forEach((n, i) => console.log(`    ${String(i + 1).padStart(2)}. ${n}`));
         const leaked = MUST_LOAD.filter((n) => names.includes(n));
         check(leaked.length === 0, `${label}: drops excluded`, leaked.length ? `leaked: ${leaked.join(', ')}` : '');
@@ -66,4 +79,7 @@ async function main() {
     process.exit(failures === 0 ? 0 : 1);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+});
