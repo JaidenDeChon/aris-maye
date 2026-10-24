@@ -3,6 +3,7 @@
      * Searches the wearable items, limited to the selected slot when there is one. Picking an item
      * puts it on.
      */
+    import { untrack } from 'svelte';
     import { Input } from '$lib/components/ui/input';
     import { itemIconPath } from '$lib/constants/calculators';
     import type { WearableItem } from '$lib/osrs-model/types';
@@ -46,11 +47,14 @@
     });
 
     let limit = $state(PAGE_SIZE);
-    // A new search, slot or body starts back at the first page.
+    // A new search or slot starts back at the first page. Keyed on those inputs rather than
+    // `matches`, which is rebuilt every time the outfit changes (e.g. picking an item or body).
+    const searchKey = $derived(`${query}|${slot}`);
     $effect(() => {
-        void matches;
+        void searchKey;
         limit = PAGE_SIZE;
-        if (list) list.scrollTop = 0;
+        const el = untrack(() => list);
+        if (el) el.scrollTop = 0;
     });
 
     let list: HTMLUListElement | undefined = $state();
