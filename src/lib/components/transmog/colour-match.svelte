@@ -4,6 +4,7 @@
      * scape.fashion's colour matching, and puts them on with a click.
      */
     import { untrack } from 'svelte';
+    import ListPager from '$lib/components/transmog/list-pager.svelte';
     import WithTooltip from '$lib/components/transmog/with-tooltip.svelte';
     import { itemIconPath } from '$lib/constants/calculators';
     import type { WearableItem } from '$lib/osrs-model/types';
@@ -31,7 +32,10 @@
 
     const { itemList, items, outfit, slot, onpick, onremove, onclearslot }: Props = $props();
 
+    /** Results asked of scape.fashion at a time. */
     const PAGE_SIZE = 40;
+    /** Height of one row in CSS pixels (`h-11`), used to fit a whole page into the list. */
+    const ROW_PX = 44;
 
     const index = $derived(nameIndex(itemList));
     const slotInfo = $derived(slot === null ? null : SLOTS.find((s) => s.id === slot));
@@ -78,7 +82,21 @@
     let seen = new Set<number>();
     let controller: AbortController | null = null;
 
-    const hasMore = $derived(!loading && !failed && source !== null && page < lastPage);
+    /** scape.fashion has more results than have been fetched. */
+    const moreToFetch = $derived(!failed && source !== null && page < lastPage);
+
+    // As many rows as fit, so a page never scrolls. Tracking the first row shown, rather than a page
+    // number, keeps the same items in view when the list is resized.
+    let listHeight = $state(0);
+    const rowsPerPage = $derived(Math.max(1, Math.floor(listHeight / ROW_PX)));
+    let first = $state(0);
+    const pageStart = $derived.by(() => {
+        const page = Math.floor(first / rowsPerPage);
+        // Once everything's fetched, a page past the end (a fetch came back empty) steps back to the last.
+        const lastPage = moreToFetch ? page : Math.max(0, Math.ceil(matches.length / rowsPerPage) - 1);
+        return Math.min(page, lastPage) * rowsPerPage;
+    });
+    const shown = $derived(matches.slice(pageStart, pageStart + rowsPerPage));
 
     // Start over whenever what's matched, where, or for which body changes.
     $effect(() => {
@@ -109,7 +127,7 @@
         source = null;
         page = 0;
         lastPage = 0;
-        if (list) list.scrollTop = 0;
+        first = 0;
         if (!current) return;
         seen = new Set(item ? [item.id] : []);
         loading = true;
@@ -154,7 +172,7 @@
     }
 
     async function loadMore(): Promise<void> {
-        if (!hasMore || !source || !controller) return;
+        if (loading || !moreToFetch || !source || !controller) return;
         const own = controller;
         loading = true;
         try {
@@ -178,25 +196,10 @@
         start(choice, sourceItem, slot, tradeableOnly, outfit.gender);
     }
 
-    // Load more while the end of the list is in view. Results that aren't wearable get dropped, so
-    // one page can come back short and leave the end still showing.
-    let list: HTMLUListElement | undefined = $state();
-    let sentinel: HTMLLIElement | undefined = $state();
-    let atEnd = $state(false);
+    // Fetch more while the page isn't full. Results that aren't wearable get dropped, so one fetch
+    // can come back short and still leave it unfilled.
     $effect(() => {
-        if (!list || !sentinel) {
-            atEnd = false;
-            return;
-        }
-        const observer = new IntersectionObserver(([entry]) => (atEnd = entry.isIntersecting), {
-            root: list,
-            rootMargin: '0px 0px 200px 0px',
-        });
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    });
-    $effect(() => {
-        if (atEnd && hasMore) untrack(loadMore);
+        if (!loading && moreToFetch && matches.length < pageStart + rowsPerPage) untrack(loadMore);
     });
 
     let missingIcons = $state<Record<number, boolean>>({});
@@ -204,7 +207,7 @@
     const isSource = (item: WearableItem) => choice?.kind === 'item' && choice.id === item.id;
 </script>
 
-<div class="flex min-h-0 flex-col gap-3">
+<div class="flex h-full min-h-0 flex-col gap-3">
     <div class="flex items-center justify-between gap-2">
         <h2 class="text-sm font-semibold">
             {slotInfo ? `${slotInfo.label} slot` : 'All slots'}
@@ -319,8 +322,8 @@
     </label>
 
     <ul
-        bind:this={list}
-        class="max-h-80 min-h-0 overflow-y-auto rounded-md border bg-muted/20 md:max-h-[26rem]"
+        bind:clientHeight={listHeight}
+        class="min-h-0 flex-1 overflow-hidden rounded-md border bg-muted/20"
         aria-label="Matching items"
         aria-busy={loading}
     >
@@ -340,12 +343,12 @@
                 This item has no colours to match. Pick another item or a colour.
             </li>
         {:else}
-            {#each matches as { item, colors, match } (item.id)}
+            {#each shown as { item, colors, match } (item.id)}
                 {@const wearing = outfit.equipment[item.slot] === item.id}
                 <li>
                     <button
                         type="button"
-                        class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none {wearing
+                        class="flex h-11 w-full items-center gap-3 px-3 text-left text-sm hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none {wearing
                             ? 'bg-primary/10'
                             : ''}"
                         aria-pressed={wearing}
@@ -383,11 +386,19 @@
                     <li class="px-3 py-6 text-center text-sm text-muted-foreground">No matches here.</li>
                 {/if}
             {/each}
-            {#if loading}
-                <li class="px-3 py-2 text-center text-xs text-muted-foreground">Finding matches…</li>
-            {:else if hasMore}
-                <li bind:this={sentinel} class="px-3 py-2 text-center text-xs text-muted-foreground">Loading more…</li>
+            {#if loading && shown.length === 0}
+                <li class="px-3 py-6 text-center text-sm text-muted-foreground">Finding matches…</li>
             {/if}
         {/if}
     </ul>
+    {#if choice && !failed && !unknownColours}
+        <ListPager
+            start={pageStart}
+            count={shown.length}
+            total={moreToFetch ? null : matches.length}
+            hasNext={pageStart + rowsPerPage < matches.length || moreToFetch}
+            onprev={() => (first = Math.max(0, pageStart - rowsPerPage))}
+            onnext={() => (first = pageStart + rowsPerPage)}
+        />
+    {/if}
 </div>
