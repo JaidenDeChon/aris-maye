@@ -163,7 +163,7 @@
     });
 
     /** Height of the side-by-side row on wide screens: fills the window below the header, within reason. */
-    const TALL = 'lg:h-[clamp(30rem,calc(100dvh-13rem),38rem)]';
+    const TALL = 'xl:h-[clamp(30rem,calc(100dvh-13rem),38rem)]';
 
     const genders: { value: Gender; label: string }[] = [
         { value: 'male', label: 'Male' },
@@ -189,23 +189,24 @@
         </div>
     {:else if !transmog}
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_13rem] lg:grid-cols-[minmax(0,1fr)_18rem_13rem] lg:gap-6"
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_13rem] xl:grid-cols-[minmax(0,1fr)_18rem_13rem] xl:gap-6"
             aria-busy="true"
         >
             <Skeleton class="h-80 md:h-[26rem] {TALL}" />
             <Skeleton class="hidden md:block md:h-[26rem] {TALL}" />
-            <Skeleton class="h-[32rem] md:col-span-2 lg:col-span-1 lg:col-start-1 lg:row-start-1 {TALL}" />
+            <Skeleton class="h-[32rem] md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 {TALL}" />
         </div>
     {:else}
         <!--
-            Wide screens: items, character and slots side by side at one height. Medium: character and
-            slots over the items. Phones: one column, character first.
+            Wide screens (xl, where the content column reaches full width): items, character and slots
+            side by side at one height. Medium: character and slots over the items. Phones: one column,
+            character first.
         -->
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_13rem] lg:grid-cols-[minmax(0,1fr)_18rem_13rem] lg:grid-rows-1 lg:gap-6 {TALL}"
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_13rem] xl:grid-cols-[minmax(0,1fr)_18rem_13rem] xl:grid-rows-1 xl:gap-6 {TALL}"
         >
             <div
-                class="relative h-80 md:col-start-1 md:row-start-1 md:h-auto md:min-h-[26rem] lg:col-start-2 lg:h-full"
+                class="relative h-80 md:col-start-1 md:row-start-1 md:h-auto md:min-h-[26rem] xl:col-start-2 xl:h-full"
             >
                 {#if expanded}
                     <button
@@ -271,7 +272,7 @@
 
             <!-- From medium up the body, slots and Remove all share a card; on phones they're rows. -->
             <div
-                class="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 md:rounded-md md:border md:p-3 lg:col-start-3"
+                class="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 md:rounded-md md:border md:p-3 xl:col-start-3"
             >
                 <div class="flex items-center justify-between gap-2 md:contents">
                     <div
@@ -347,7 +348,7 @@
 
             <!-- The tabs sit on top of the panel they switch, so it's clear what they change. -->
             <div
-                class="flex h-[32rem] min-w-0 flex-col overflow-hidden rounded-md border md:col-span-2 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:h-full"
+                class="flex h-[32rem] min-w-0 flex-col overflow-hidden rounded-md border md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:h-full"
             >
                 <div class="grid grid-cols-2 border-b bg-muted/40" role="tablist" aria-label="Find items">
                     {#each finders as finder (finder.value)}
