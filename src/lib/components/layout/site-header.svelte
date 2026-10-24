@@ -10,6 +10,7 @@
     import type { IGameItem } from '$lib/models/game-item';
     import { addRecentSearch, recentSearchesStore, type RecentSearchEntry } from '$lib/stores/recent-searches-store';
     import IronmanModeToggle from './ironman-mode-toggle.svelte';
+    import ThemeToggle from './theme-toggle.svelte';
 
     let searchQuery = $state('');
     let searchDialogOpen = $state(false);
@@ -75,10 +76,10 @@
 
 <header class="flex w-full h-16 sticky top-0 border-border border-b custom-bg-blur z-30">
     <!--
-        `content-aligned-row` lines the logo and the Ironman toggle up with the page's `content-sizing`
+        `content-aligned-row` lines the logo and the Ironman and theme toggles up with the page's `content-sizing`
         column, while the menu button stays at the far left on wider screens.
     -->
-    <div class="content-aligned-row py-4 w-full flex gap-3 items-center">
+    <div class="content-aligned-row py-4 w-full flex gap-1.5 min-[360px]:gap-2 sm:gap-3 items-center">
         <Sidebar.Trigger
             class={buttonVariants({
                 class: 'h-10 w-10 min-h-10 min-w-10 text-foreground border border-input rounded-md bg-background/70 hover:bg-muted/55 transition-colors md:absolute md:left-8 md:top-1/2 md:-translate-y-1/2',
@@ -86,7 +87,8 @@
         />
 
         <a href={resolve('/')} aria-label="logo and home link">
-            <span class="rs-font-with-shadow text-primary text-xl">Aris Maye</span>
+            <span class="rs-font-with-shadow text-primary text-lg whitespace-nowrap min-[360px]:text-xl">Aris Maye</span
+            >
         </a>
 
         <!-- Button that looks like search bar; opens command modal. -->
@@ -208,5 +210,6 @@
         </Dialog.Root>
 
         <IronmanModeToggle />
+        <ThemeToggle />
     </div>
 </header>
