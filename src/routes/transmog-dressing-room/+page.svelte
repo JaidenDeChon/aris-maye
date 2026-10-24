@@ -246,7 +246,7 @@
                         manifest={transmog.manifest}
                         {mesh}
                         {textures}
-                        idle={idleFor(outfit)}
+                        idle={idleFor(outfit, transmog.manifest.stances)}
                         scale={expanded ? 1 : 0.8}
                         class="h-full rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] {expanded
                             ? 'border-0'
@@ -493,7 +493,20 @@
                 class="underline underline-offset-2 hover:text-foreground"
                 rel="noopener noreferrer"
                 target="_blank">scape.fashion</a
-            >'s API.
+            >'s API. Weapon stances come from
+            <a
+                href="https://github.com/geheur/weapon-animation-replacer"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">Weapon Animation Replacer</a
+            >
+            and
+            <a
+                href="https://github.com/AlterRSPS/Alter"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">Alter</a
+            >.
         </p>
         <p>
             Old School RuneScape and its content belong to Jagex Ltd. This site isn't made or endorsed by Jagex, OpenRS2

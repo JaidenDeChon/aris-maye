@@ -91,6 +91,9 @@ describe('share links', () => {
     });
 });
 
-test('every outfit idles in the standard stance until weapon stances exist', () => {
-    expect(idleFor({ gender: 'male', equipment: { [EquipmentSlot.weapon]: 11802 } })).toBe('idle');
+test('a weapon with its own stance idles in it; anything else uses the standard stand', () => {
+    const stances = { 11802: 'stand7053' };
+    expect(idleFor({ gender: 'male', equipment: { [EquipmentSlot.weapon]: 11802 } }, stances)).toBe('stand7053');
+    expect(idleFor({ gender: 'male', equipment: { [EquipmentSlot.weapon]: 4151 } }, stances)).toBe('idle');
+    expect(idleFor({ gender: 'male', equipment: {} }, stances)).toBe('idle');
 });
