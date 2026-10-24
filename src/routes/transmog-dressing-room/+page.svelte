@@ -209,21 +209,21 @@
         </div>
     {:else if !transmog}
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:gap-6"
+            class="grid gap-4 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:gap-6 {TALL}"
             aria-busy="true"
         >
-            <Skeleton class="h-80 md:h-[26rem] {TALL}" />
-            <Skeleton class="hidden md:block md:h-[26rem] {TALL}" />
-            <Skeleton class="h-[32rem] md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 {TALL}" />
+            <Skeleton class="h-80 md:h-[26rem] xl:h-full" />
+            <Skeleton class="hidden md:block md:h-[26rem] xl:h-full" />
+            <Skeleton class="h-[32rem] md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:h-full" />
         </div>
     {:else}
         <!--
-            Wide screens (xl, where the content column reaches full width): items, character and slots
-            side by side at one height. Medium: character and slots over the items. Phones: one column,
-            character first.
+            One card holds the items, character and slots. Wide screens (xl, where the content column
+            reaches full width): side by side at one height. Medium: character and slots over the items.
+            Phones: one column, character first.
         -->
         <div
-            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:grid-rows-1 xl:gap-6 {TALL}"
+            class="grid gap-4 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:grid-rows-1 xl:gap-6 {TALL}"
         >
             <div
                 class="relative h-80 md:col-start-1 md:row-start-1 md:h-auto md:min-h-[26rem] xl:col-start-2 xl:h-full"
@@ -248,9 +248,7 @@
                         {textures}
                         idle={idleFor(outfit, transmog.manifest.stances)}
                         scale={expanded ? 1 : 0.8}
-                        class="h-full rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] {expanded
-                            ? 'border-0'
-                            : ''}"
+                        class="h-full rounded-md bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)]"
                     />
                     <div
                         class="absolute top-2 left-2 flex h-8 rounded-md border bg-background/80 p-0.5 backdrop-blur"
@@ -317,22 +315,24 @@
             </div>
 
             <!--
-                From medium up the equipment slots and emotes share a tabbed card, like the item finder;
+                From medium up the equipment slots and emotes share a tabbed panel, like the item finder;
                 on phones they're an emote menu and a strip of slots.
             -->
-            <div
-                class="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 md:gap-0 md:overflow-hidden md:rounded-md md:border xl:col-start-3"
-            >
-                <div class="hidden grid-cols-2 border-b bg-muted/40 md:grid" role="tablist" aria-label="Character">
+            <div class="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 xl:col-start-3">
+                <div
+                    class="hidden h-9 grid-cols-2 rounded-md border p-0.5 md:grid"
+                    role="tablist"
+                    aria-label="Character"
+                >
                     {#each characterTabs as tab (tab.value)}
                         <button
                             type="button"
                             role="tab"
                             aria-selected={characterTab === tab.value}
                             aria-controls="character-panel"
-                            class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {characterTab ===
+                            class="flex items-center justify-center gap-1.5 rounded px-3 text-sm transition-colors {characterTab ===
                             tab.value
-                                ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                                ? 'bg-primary text-primary-foreground'
                                 : 'text-muted-foreground hover:text-foreground'}"
                             onclick={() => (characterTab = tab.value)}
                         >
@@ -341,7 +341,7 @@
                         </button>
                     {/each}
                 </div>
-                <div id="character-panel" role="tabpanel" class="hidden flex-1 flex-col gap-3 p-3 md:flex">
+                <div id="character-panel" role="tabpanel" class="hidden flex-1 flex-col gap-3 md:flex">
                     {#if characterTab === 'equipment'}
                         <div class="flex flex-1 items-center justify-center">
                             <EquipmentSlots
@@ -410,18 +410,18 @@
 
             <!-- The tabs sit on top of the panel they switch, so it's clear what they change. -->
             <div
-                class="flex h-[32rem] min-w-0 flex-col overflow-hidden rounded-md border md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:h-full"
+                class="flex h-[32rem] min-w-0 flex-col gap-3 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:h-full"
             >
-                <div class="grid grid-cols-2 border-b bg-muted/40" role="tablist" aria-label="Find items">
+                <div class="grid h-9 grid-cols-2 rounded-md border p-0.5" role="tablist" aria-label="Find items">
                     {#each finders as finder (finder.value)}
                         <button
                             type="button"
                             role="tab"
                             aria-selected={finderMode === finder.value}
                             aria-controls="finder-panel"
-                            class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {finderMode ===
+                            class="flex items-center justify-center gap-1.5 rounded px-3 text-sm transition-colors {finderMode ===
                             finder.value
-                                ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                                ? 'bg-primary text-primary-foreground'
                                 : 'text-muted-foreground hover:text-foreground'}"
                             onclick={() => (finderMode = finder.value)}
                         >
@@ -430,7 +430,7 @@
                         </button>
                     {/each}
                 </div>
-                <div id="finder-panel" role="tabpanel" class="min-h-0 flex-1 p-3">
+                <div id="finder-panel" role="tabpanel" class="min-h-0 flex-1">
                     {#if finderMode === 'search'}
                         <ItemPicker
                             itemList={transmog.itemList}
