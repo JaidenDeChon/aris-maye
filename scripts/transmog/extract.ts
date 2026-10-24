@@ -11,6 +11,7 @@
  * and falls back to the last good output if OpenRS2 can't be reached.
  */
 import { closeGaps } from './close-gaps';
+import { TRANSMOG_STANCES } from './paths';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -139,7 +140,30 @@ const ANIMATIONS: Record<string, number> = {
     shrug: 2113,
 };
 
+/** Weapon slot, the one whose item decides the stance. */
+const SLOT_WEAPON = 3;
+
 type Log = (message: string) => void;
+
+/**
+ * Stand animation per kept weapon, by item id. The table lists one id per item, so a variant it
+ * doesn't name (poisoned, ornamented, a different charge) takes the stance of one with its name.
+ */
+function weaponStances(all: ItemDefinition[], kept: ItemDefinition[]): Map<number, number> {
+    const listed = (JSON.parse(readFileSync(TRANSMOG_STANCES, 'utf8')) as { items: Record<string, number> }).items;
+    const byName = new Map<string, number>();
+    for (const item of all) {
+        const stand = listed[item.id];
+        if (stand !== undefined && !byName.has(item.name)) byName.set(item.name, stand);
+    }
+    const stances = new Map<number, number>();
+    for (const item of kept) {
+        if (item.wearPos1 !== SLOT_WEAPON) continue;
+        const stand = listed[item.id] ?? byName.get(item.name);
+        if (stand !== undefined) stances.set(item.id, stand);
+    }
+    return stances;
+}
 
 function packModel(model: ModelDefinition): ModelFile {
     const anyNonZero = (xs: number[]) => xs.some((x) => x !== 0);
@@ -335,13 +359,10 @@ export function extractTransmogData(
         const sequenceFiles = cache.files(INDEX_CONFIGS, CONFIG_SEQUENCE);
         const framemapDefs = new Map<number, FramemapDefinition>();
         const frameGroups = new Map<number, Map<number, Uint8Array>>();
-        const animations: Record<string, Animation> = {};
-        for (const [name, sequenceId] of Object.entries(ANIMATIONS)) {
+        /** A sequence's frames, or null for a skeletal animation, which the renderer can't play. */
+        const readAnimation = (sequenceId: number): Animation | null => {
             const sequence = decodeSequence(sequenceId, sequenceFiles.get(sequenceId)!);
-            if (sequence.animMayaId !== -1) {
-                log(`  skipping ${name} (${sequenceId}): it's a skeletal animation`);
-                continue;
-            }
+            if (sequence.animMayaId !== -1) return null;
             const frames: number[][] = [];
             for (const frameId of sequence.frameIds) {
                 const group = frameId >>> 16;
@@ -357,8 +378,31 @@ export function extractTransmogData(
                 frame.slots.forEach((slot, i) => packedFrame.push(slot, frame.dx[i], frame.dy[i], frame.dz[i]));
                 frames.push(packedFrame);
             }
-            animations[name] = { lengths: sequence.frameLengths, frames };
+            return { lengths: sequence.frameLengths, frames };
+        };
+        const animations: Record<string, Animation> = {};
+        for (const [name, sequenceId] of Object.entries(ANIMATIONS)) {
+            const animation = readAnimation(sequenceId);
+            if (animation) animations[name] = animation;
+            else log(`  skipping ${name} (${sequenceId}): it's a skeletal animation`);
         }
+
+        // Weapon stances, named stand<sequence id>. Ones that can't be played keep the default idle.
+        const stances: TransmogManifest['stances'] = {};
+        let skippedStances = 0;
+        for (const [itemId, sequenceId] of weaponStances(items, kept)) {
+            const name = `stand${sequenceId}`;
+            if (!(name in animations)) {
+                const animation = sequenceFiles.has(sequenceId) ? readAnimation(sequenceId) : null;
+                if (!animation) {
+                    skippedStances++;
+                    continue;
+                }
+                animations[name] = animation;
+            }
+            stances[itemId] = name;
+        }
+        if (skippedStances) log(`  ${skippedStances} weapons keep the default stance: theirs is missing or skeletal`);
         const framemaps: Record<string, Framemap> = {};
         for (const [id, fm] of framemapDefs) framemaps[id] = { types: fm.types, labels: fm.labels };
 
@@ -372,6 +416,7 @@ export function extractTransmogData(
             },
             bodies,
             animations,
+            stances,
             framemaps,
             textureAnimations,
         };

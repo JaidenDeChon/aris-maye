@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Download, Link, Palette, RotateCcw, Search } from 'lucide-svelte';
+    import { Download, Hand, Link, Maximize2, Minimize2, Palette, RotateCcw, Search, Shirt } from 'lucide-svelte';
     import { onMount, untrack } from 'svelte';
     import { toast } from 'svelte-sonner';
     import { replaceState } from '$app/navigation';
@@ -9,6 +9,7 @@
     import ColourMatch from '$lib/components/transmog/colour-match.svelte';
     import WithTooltip from '$lib/components/transmog/with-tooltip.svelte';
     import EquipmentSlots from '$lib/components/transmog/equipment-slots.svelte';
+    import GenderIcon from '$lib/components/transmog/gender-icon.svelte';
     import ItemPicker from '$lib/components/transmog/item-picker.svelte';
     import OutfitCost from '$lib/components/transmog/outfit-cost.svelte';
     import SavedOutfits from '$lib/components/transmog/saved-outfits.svelte';
@@ -153,11 +154,44 @@
     ] as const;
     let finderMode = $state<(typeof finders)[number]['value']>('search');
 
+    const characterTabs = [
+        { value: 'equipment', label: 'Equipment', icon: Shirt },
+        { value: 'emotes', label: 'Emotes', icon: Hand },
+    ] as const;
+    let characterTab = $state<(typeof characterTabs)[number]['value']>('equipment');
+
+    /** The viewer is blown up to fill the window. */
+    let expanded = $state(false);
+    $effect(() => {
+        if (!expanded) return;
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => (document.body.style.overflow = overflow);
+    });
+
+    /** Height of the side-by-side row on wide screens: fills the window below the header, within reason. */
+    const TALL = 'xl:h-[clamp(30rem,calc(100dvh-13rem),38rem)]';
+
     const genders: { value: Gender; label: string }[] = [
         { value: 'male', label: 'Male' },
         { value: 'female', label: 'Female' },
     ];
 </script>
+
+{#snippet removeAll(className = '')}
+    <Button
+        variant="outline"
+        size="sm"
+        class="h-9 gap-1.5 px-2.5 {className}"
+        disabled={isEmptyOutfit(outfit)}
+        onclick={() => (outfit = { ...EMPTY_OUTFIT, gender: outfit.gender })}
+    >
+        <img src={slotSprite('removeAll')} alt="" class="h-[22px] w-[29px] [image-rendering:pixelated]" />
+        Remove all
+    </Button>
+{/snippet}
+
+<svelte:window onkeydown={(event) => expanded && event.key === 'Escape' && (expanded = false)} />
 
 <SeoHead seo={transmogSeo} />
 <svelte:head>
@@ -174,98 +208,194 @@
             The outfit data isn't available right now. Please try again later.
         </div>
     {:else if !transmog}
-        <div class="grid gap-6 md:grid-cols-[22rem_minmax(0,1fr)]" aria-busy="true">
-            <Skeleton class="h-[26rem] md:order-2 md:h-[40rem]" />
-            <Skeleton class="h-[26rem] md:h-[40rem]" />
+        <div
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:gap-6"
+            aria-busy="true"
+        >
+            <Skeleton class="h-80 md:h-[26rem] {TALL}" />
+            <Skeleton class="hidden md:block md:h-[26rem] {TALL}" />
+            <Skeleton class="h-[32rem] md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 {TALL}" />
         </div>
     {:else}
-        <!-- Controls on the left and the character on the right; on phones the character comes first. -->
-        <div class="grid gap-6 md:grid-cols-[22rem_minmax(0,1fr)]">
-            <div class="relative min-w-0 md:sticky md:top-20 md:col-start-2 md:row-start-1 md:self-start">
-                <TransmogViewer
-                    bind:this={viewer}
-                    manifest={transmog.manifest}
-                    {mesh}
-                    {textures}
-                    idle={idleFor(outfit)}
-                    class="h-[26rem] rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] md:h-[min(40rem,calc(100dvh-6rem))]"
-                />
-                <div class="absolute top-2 right-2 flex gap-1" role="toolbar" aria-label="Outfit actions">
-                    {#each viewerActions as action (action.label)}
-                        <WithTooltip label={action.label} side="bottom">
+        <!--
+            Wide screens (xl, where the content column reaches full width): items, character and slots
+            side by side at one height. Medium: character and slots over the items. Phones: one column,
+            character first.
+        -->
+        <div
+            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem] xl:grid-cols-[minmax(0,1fr)_18rem_16rem] xl:grid-rows-1 xl:gap-6 {TALL}"
+        >
+            <div
+                class="relative h-80 md:col-start-1 md:row-start-1 md:h-auto md:min-h-[26rem] xl:col-start-2 xl:h-full"
+            >
+                {#if expanded}
+                    <button
+                        type="button"
+                        class="fixed inset-0 z-40 cursor-default bg-black/60"
+                        aria-label="Shrink the character view"
+                        onclick={() => (expanded = false)}
+                    ></button>
+                {/if}
+                <div
+                    class={expanded
+                        ? 'fixed inset-4 z-50 overflow-hidden rounded-lg border bg-background shadow-2xl md:inset-10'
+                        : 'absolute inset-0'}
+                >
+                    <TransmogViewer
+                        bind:this={viewer}
+                        manifest={transmog.manifest}
+                        {mesh}
+                        {textures}
+                        idle={idleFor(outfit, transmog.manifest.stances)}
+                        scale={expanded ? 1 : 0.8}
+                        class="h-full rounded-md border bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.10),transparent_70%)] {expanded
+                            ? 'border-0'
+                            : ''}"
+                    />
+                    <div
+                        class="absolute top-2 left-2 flex h-8 rounded-md border bg-background/80 p-0.5 backdrop-blur"
+                        role="radiogroup"
+                        aria-label="Body"
+                    >
+                        {#each genders as option (option.value)}
+                            <WithTooltip label={option.label} side="bottom">
+                                {#snippet children(props)}
+                                    <button
+                                        {...props}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={outfit.gender === option.value}
+                                        aria-label={option.label}
+                                        class="flex h-full w-7 items-center justify-center rounded-sm transition-colors {outfit.gender ===
+                                        option.value
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'text-muted-foreground hover:text-foreground'}"
+                                        onclick={() => setGender(option.value)}
+                                    >
+                                        <GenderIcon gender={option.value} class="size-4" />
+                                    </button>
+                                {/snippet}
+                            </WithTooltip>
+                        {/each}
+                    </div>
+                    <div class="absolute top-2 right-2 flex gap-1" role="toolbar" aria-label="Outfit actions">
+                        {#each viewerActions as action (action.label)}
+                            <WithTooltip label={action.label} side="bottom">
+                                {#snippet children(props)}
+                                    <Button
+                                        {...props}
+                                        variant="outline"
+                                        class="size-8 bg-background/80 p-0 backdrop-blur"
+                                        aria-label={action.label}
+                                        onclick={action.run}
+                                    >
+                                        <action.icon class="size-4" />
+                                    </Button>
+                                {/snippet}
+                            </WithTooltip>
+                        {/each}
+                        <WithTooltip label={expanded ? 'Shrink' : 'Enlarge'} side="bottom">
                             {#snippet children(props)}
                                 <Button
                                     {...props}
                                     variant="outline"
-                                    class="size-9 bg-background/80 p-0 backdrop-blur"
-                                    aria-label={action.label}
-                                    onclick={action.run}
+                                    class="size-8 bg-background/80 p-0 backdrop-blur"
+                                    aria-label={expanded ? 'Shrink the character view' : 'Enlarge the character view'}
+                                    aria-pressed={expanded}
+                                    onclick={() => (expanded = !expanded)}
                                 >
-                                    <action.icon class="size-4" />
+                                    {#if expanded}
+                                        <Minimize2 class="size-4" />
+                                    {:else}
+                                        <Maximize2 class="size-4" />
+                                    {/if}
                                 </Button>
                             {/snippet}
                         </WithTooltip>
-                    {/each}
+                    </div>
                 </div>
             </div>
 
-            <div class="flex min-w-0 flex-col gap-4 md:col-start-1 md:row-start-1">
-                <div class="flex items-center justify-between gap-2">
-                    <div class="flex h-9 rounded-md border p-0.5" role="radiogroup" aria-label="Body">
-                        {#each genders as option (option.value)}
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked={outfit.gender === option.value}
-                                class="rounded px-3 text-sm transition-colors {outfit.gender === option.value
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-muted-foreground hover:text-foreground'}"
-                                onclick={() => setGender(option.value)}
-                            >
-                                {option.label}
-                            </button>
-                        {/each}
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="gap-1.5 px-2.5"
-                        disabled={isEmptyOutfit(outfit)}
-                        onclick={() => (outfit = { ...EMPTY_OUTFIT, gender: outfit.gender })}
-                    >
-                        <img
-                            src={slotSprite('removeAll')}
-                            alt=""
-                            class="h-[22px] w-[29px] [image-rendering:pixelated]"
-                        />
-                        Remove all
-                    </Button>
+            <!--
+                From medium up the equipment slots and emotes share a tabbed card, like the item finder;
+                on phones they're an emote menu and a strip of slots.
+            -->
+            <div
+                class="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 md:gap-0 md:overflow-hidden md:rounded-md md:border xl:col-start-3"
+            >
+                <div class="hidden grid-cols-2 border-b bg-muted/40 md:grid" role="tablist" aria-label="Character">
+                    {#each characterTabs as tab (tab.value)}
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={characterTab === tab.value}
+                            aria-controls="character-panel"
+                            class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {characterTab ===
+                            tab.value
+                                ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                                : 'text-muted-foreground hover:text-foreground'}"
+                            onclick={() => (characterTab = tab.value)}
+                        >
+                            <tab.icon class="size-4" />
+                            {tab.label}
+                        </button>
+                    {/each}
+                </div>
+                <div id="character-panel" role="tabpanel" class="hidden flex-1 flex-col gap-3 p-3 md:flex">
+                    {#if characterTab === 'equipment'}
+                        <div class="flex flex-1 items-center justify-center">
+                            <EquipmentSlots
+                                {outfit}
+                                items={transmog.items}
+                                selected={selectedSlot}
+                                layout="grid"
+                                onselect={(slot) => (selectedSlot = slot)}
+                            />
+                        </div>
+                        {@render removeAll('w-full')}
+                    {:else}
+                        <div class="grid grid-cols-4 gap-1">
+                            {#each EMOTES as emote (emote.key)}
+                                <WithTooltip label={emote.label}>
+                                    {#snippet children(props)}
+                                        <button
+                                            {...props}
+                                            type="button"
+                                            class="flex aspect-square items-center justify-center rounded-sm border bg-muted/30 hover:border-primary/60 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                                            aria-label={emote.label}
+                                            onclick={() => viewer?.playEmote(emote.key)}
+                                        >
+                                            <img
+                                                src={emoteIcon(emote.key)}
+                                                alt=""
+                                                width="48"
+                                                height="48"
+                                                class="size-9 [image-rendering:pixelated]"
+                                            />
+                                        </button>
+                                    {/snippet}
+                                </WithTooltip>
+                            {/each}
+                        </div>
+                    {/if}
                 </div>
 
-                <!-- On phones a menu keeps the slots close to the viewer; wider screens get the emote tab. -->
-                <select
-                    class="h-9 rounded-md border bg-background px-3 text-sm md:hidden"
-                    aria-label="Play an emote"
-                    onchange={(event) => {
-                        const key = event.currentTarget.value;
-                        if (key) viewer?.playEmote(key);
-                        event.currentTarget.value = '';
-                    }}
-                >
-                    <option value="">Play an emote…</option>
-                    {#each EMOTES as emote (emote.key)}
-                        <option value={emote.key}>{emote.label}</option>
-                    {/each}
-                </select>
-
-                <div class="hidden md:block">
-                    <EquipmentSlots
-                        {outfit}
-                        items={transmog.items}
-                        selected={selectedSlot}
-                        layout="grid"
-                        onselect={(slot) => (selectedSlot = slot)}
-                    />
+                <div class="flex gap-2 md:hidden">
+                    <select
+                        class="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm"
+                        aria-label="Play an emote"
+                        onchange={(event) => {
+                            const key = event.currentTarget.value;
+                            if (key) viewer?.playEmote(key);
+                            event.currentTarget.value = '';
+                        }}
+                    >
+                        <option value="">Play an emote…</option>
+                        {#each EMOTES as emote (emote.key)}
+                            <option value={emote.key}>{emote.label}</option>
+                        {/each}
+                    </select>
+                    {@render removeAll()}
                 </div>
                 <div class="md:hidden">
                     <EquipmentSlots
@@ -276,76 +406,52 @@
                         onselect={(slot) => (selectedSlot = slot)}
                     />
                 </div>
-                <!-- The tabs sit on top of the panel they switch, so it's clear what they change. -->
-                <div class="overflow-hidden rounded-md border">
-                    <div class="grid grid-cols-2 border-b bg-muted/40" role="tablist" aria-label="Find items">
-                        {#each finders as finder (finder.value)}
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={finderMode === finder.value}
-                                aria-controls="finder-panel"
-                                class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {finderMode ===
-                                finder.value
-                                    ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
-                                    : 'text-muted-foreground hover:text-foreground'}"
-                                onclick={() => (finderMode = finder.value)}
-                            >
-                                <finder.icon class="size-4" />
-                                {finder.label}
-                            </button>
-                        {/each}
-                    </div>
-                    <div id="finder-panel" role="tabpanel" class="p-3">
-                        {#if finderMode === 'search'}
-                            <ItemPicker
-                                itemList={transmog.itemList}
-                                {outfit}
-                                slot={selectedSlot}
-                                onpick={pick}
-                                onremove={(slot) => (outfit = unequip(outfit, slot))}
-                                onclearslot={() => (selectedSlot = null)}
-                            />
-                        {:else}
-                            <ColourMatch
-                                itemList={transmog.itemList}
-                                items={transmog.items}
-                                {outfit}
-                                slot={selectedSlot}
-                                onpick={pick}
-                                onremove={(slot) => (outfit = unequip(outfit, slot))}
-                                onclearslot={() => (selectedSlot = null)}
-                            />
-                        {/if}
-                    </div>
-                </div>
+            </div>
 
-                <section aria-labelledby="emotes-heading" class="hidden flex-col gap-1.5 md:flex">
-                    <h2 id="emotes-heading" class="text-sm font-semibold">Emotes</h2>
-                    <div class="grid grid-cols-6 gap-1">
-                        {#each EMOTES as emote (emote.key)}
-                            <WithTooltip label={emote.label}>
-                                {#snippet children(props)}
-                                    <button
-                                        {...props}
-                                        type="button"
-                                        class="flex aspect-square items-center justify-center rounded-sm border bg-muted/30 hover:border-primary/60 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                                        aria-label={emote.label}
-                                        onclick={() => viewer?.playEmote(emote.key)}
-                                    >
-                                        <img
-                                            src={emoteIcon(emote.key)}
-                                            alt=""
-                                            width="48"
-                                            height="48"
-                                            class="size-12 [image-rendering:pixelated]"
-                                        />
-                                    </button>
-                                {/snippet}
-                            </WithTooltip>
-                        {/each}
-                    </div>
-                </section>
+            <!-- The tabs sit on top of the panel they switch, so it's clear what they change. -->
+            <div
+                class="flex h-[32rem] min-w-0 flex-col overflow-hidden rounded-md border md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:h-full"
+            >
+                <div class="grid grid-cols-2 border-b bg-muted/40" role="tablist" aria-label="Find items">
+                    {#each finders as finder (finder.value)}
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={finderMode === finder.value}
+                            aria-controls="finder-panel"
+                            class="flex h-10 items-center justify-center gap-1.5 text-sm transition-colors {finderMode ===
+                            finder.value
+                                ? 'bg-background font-medium text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                                : 'text-muted-foreground hover:text-foreground'}"
+                            onclick={() => (finderMode = finder.value)}
+                        >
+                            <finder.icon class="size-4" />
+                            {finder.label}
+                        </button>
+                    {/each}
+                </div>
+                <div id="finder-panel" role="tabpanel" class="min-h-0 flex-1 p-3">
+                    {#if finderMode === 'search'}
+                        <ItemPicker
+                            itemList={transmog.itemList}
+                            {outfit}
+                            slot={selectedSlot}
+                            onpick={pick}
+                            onremove={(slot) => (outfit = unequip(outfit, slot))}
+                            onclearslot={() => (selectedSlot = null)}
+                        />
+                    {:else}
+                        <ColourMatch
+                            itemList={transmog.itemList}
+                            items={transmog.items}
+                            {outfit}
+                            slot={selectedSlot}
+                            onpick={pick}
+                            onremove={(slot) => (outfit = unequip(outfit, slot))}
+                            onclearslot={() => (selectedSlot = null)}
+                        />
+                    {/if}
+                </div>
             </div>
         </div>
 
@@ -387,7 +493,20 @@
                 class="underline underline-offset-2 hover:text-foreground"
                 rel="noopener noreferrer"
                 target="_blank">scape.fashion</a
-            >'s API.
+            >'s API. Weapon stances come from
+            <a
+                href="https://github.com/geheur/weapon-animation-replacer"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">Weapon Animation Replacer</a
+            >
+            and
+            <a
+                href="https://github.com/AlterRSPS/Alter"
+                class="underline underline-offset-2 hover:text-foreground"
+                rel="noopener noreferrer"
+                target="_blank">Alter</a
+            >.
         </p>
         <p>
             Old School RuneScape and its content belong to Jagex Ltd. This site isn't made or endorsed by Jagex, OpenRS2

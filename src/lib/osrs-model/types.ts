@@ -4,7 +4,7 @@
  */
 
 /** Bump when the shape of these files changes, so stale build caches get regenerated. */
-export const TRANSMOG_DATA_VERSION = 4;
+export const TRANSMOG_DATA_VERSION = 5;
 
 export interface Animation {
     /** Client cycles (20ms) per frame. */
@@ -36,6 +36,8 @@ export interface TransmogManifest {
     /** Default body per gender, keyed by the equipment slot each kit occupies. */
     bodies: Record<Gender, Record<number, BodyKit>>;
     animations: Record<string, Animation>;
+    /** The stand animation (a key of `animations`) for each weapon that doesn't use the default idle. */
+    stances: Record<string, string>;
     framemaps: Record<string, Framemap>;
     /** Textures that scroll, as [du, dv] in 128ths of the texture per client cycle. */
     textureAnimations: Record<string, [number, number]>;

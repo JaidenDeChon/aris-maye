@@ -16,10 +16,12 @@
         textures: Map<number, Texture>;
         /** Name of the looping animation (see idleFor). */
         idle: string;
+        /** How big to draw the player, where 1 fills about 80% of the height. */
+        scale?: number;
         class?: string;
     }
 
-    const { manifest, mesh, textures, idle, class: className = '' }: Props = $props();
+    const { manifest, mesh, textures, idle, scale = 1, class: className = '' }: Props = $props();
 
     /**
      * Vertices snap to a grid this many CSS pixels apart, so joints still pop between positions
@@ -54,8 +56,8 @@
         yaw,
         pitch: 96,
         distance: 1000,
-        // Fit a standing player (about 200 units tall) into roughly 80% of the height, leaving room for raised weapons.
-        zoom: Math.round(height * 3.7),
+        // At scale 1, fit a standing player (about 200 units tall) into roughly 80% of the height, leaving room for raised weapons.
+        zoom: Math.round(height * 3.7 * scale),
         centerX: width >> 1,
         centerY: Math.round(height * 0.53),
         lift: 95,
@@ -65,6 +67,11 @@
         if (!mesh) return;
         model = new PlayerModel(mesh, manifest.framemaps);
         if (rasterizer) rasterizer.textures = textures;
+        dirty = true;
+    });
+
+    $effect(() => {
+        void scale;
         dirty = true;
     });
 

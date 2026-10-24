@@ -18,6 +18,7 @@ const manifest: TransmogManifest = {
         female: {},
     },
     animations: {},
+    stances: {},
     framemaps: {},
     textureAnimations: {},
 };

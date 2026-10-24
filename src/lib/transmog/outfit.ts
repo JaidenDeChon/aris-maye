@@ -65,12 +65,12 @@ export function unequip(outfit: Outfit, slot: number): Outfit {
 }
 
 /**
- * Which looping animation to play while idle. Every outfit uses the standard stand for now; this
- * is where weapon stances (the 2h, staff, whip... idles) would be chosen once there's data for them.
+ * Which looping animation to play while idle: the weapon's own stance (a godsword, staff, 2h...)
+ * when it has one, otherwise the standard stand.
  */
-export function idleFor(outfit: Outfit): string {
-    void outfit;
-    return 'idle';
+export function idleFor(outfit: Outfit, stances: Record<string, string>): string {
+    const weapon = outfit.equipment[EquipmentSlot.weapon];
+    return (weapon !== undefined && stances[weapon]) || 'idle';
 }
 
 /** Writes an outfit as URL parameters, e.g. ?gender=female&head=1163&body=1127. */

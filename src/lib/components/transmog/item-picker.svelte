@@ -3,6 +3,7 @@
      * Searches the wearable items, limited to the selected slot when there is one. Picking an item
      * puts it on.
      */
+    import ListPager from '$lib/components/transmog/list-pager.svelte';
     import { Input } from '$lib/components/ui/input';
     import { itemIconPath } from '$lib/constants/calculators';
     import type { WearableItem } from '$lib/osrs-model/types';
@@ -21,8 +22,8 @@
 
     const { itemList, outfit, slot, onpick, onremove, onclearslot }: Props = $props();
 
-    /** Rows added each time the list is scrolled to the bottom. */
-    const PAGE_SIZE = 80;
+    /** Height of one row in CSS pixels (`h-11`), used to fit a whole page into the list. */
+    const ROW_PX = 44;
 
     let query = $state('');
     const slotInfo = $derived(slot === null ? null : SLOTS.find((s) => s.id === slot));
@@ -45,34 +46,30 @@
         return counts;
     });
 
-    let limit = $state(PAGE_SIZE);
-    // A new search, slot or body starts back at the first page.
-    $effect(() => {
-        void matches;
-        limit = PAGE_SIZE;
-        if (list) list.scrollTop = 0;
+    // As many rows as fit, so a page never scrolls. Tracking the first row shown, rather than a page
+    // number, keeps the same items in view when the list is resized.
+    let listHeight = $state(0);
+    const pageSize = $derived(Math.max(1, Math.floor(listHeight / ROW_PX)));
+    let first = $state(0);
+    const pageStart = $derived.by(() => {
+        const lastPage = Math.max(0, Math.ceil(matches.length / pageSize) - 1);
+        return Math.min(Math.floor(first / pageSize), lastPage) * pageSize;
     });
+    const shown = $derived(matches.slice(pageStart, pageStart + pageSize));
 
-    let list: HTMLUListElement | undefined = $state();
-    let sentinel: HTMLLIElement | undefined = $state();
-    // Load the next page as the end of the list scrolls into view.
+    // A new search or slot starts back at the first page. Keyed on those inputs rather than
+    // `matches`, which is rebuilt every time the outfit changes (e.g. picking an item or body).
+    const searchKey = $derived(`${query}|${slot}`);
     $effect(() => {
-        if (!list || !sentinel) return;
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) limit += PAGE_SIZE;
-            },
-            { root: list, rootMargin: '0px 0px 200px 0px' },
-        );
-        observer.observe(sentinel);
-        return () => observer.disconnect();
+        void searchKey;
+        first = 0;
     });
 
     let missingIcons = $state<Record<number, boolean>>({});
     const slotKey = (id: number) => SLOTS.find((s) => s.id === id)?.key ?? 'tile';
 </script>
 
-<div class="flex min-h-0 flex-col gap-2">
+<div class="flex h-full min-h-0 flex-col gap-2">
     <div class="flex items-center justify-between gap-2">
         <h2 class="text-sm font-semibold">
             {slotInfo ? `${slotInfo.label} slot` : 'All slots'}
@@ -107,16 +104,16 @@
     />
 
     <ul
-        bind:this={list}
-        class="max-h-80 min-h-0 overflow-y-auto rounded-md border bg-muted/20 md:max-h-[26rem]"
+        bind:clientHeight={listHeight}
+        class="min-h-0 flex-1 overflow-hidden rounded-md border bg-muted/20"
         aria-label="Items"
     >
-        {#each matches.slice(0, limit) as item (item.id)}
+        {#each shown as item (item.id)}
             {@const worn = outfit.equipment[item.slot] === item.id}
             <li>
                 <button
                     type="button"
-                    class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none {worn
+                    class="flex h-11 w-full items-center gap-3 px-3 text-left text-sm hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none {worn
                         ? 'bg-primary/10'
                         : ''}"
                     aria-pressed={worn}
@@ -148,8 +145,13 @@
         {:else}
             <li class="px-3 py-6 text-center text-sm text-muted-foreground">No wearable items match “{query}”.</li>
         {/each}
-        {#if matches.length > limit}
-            <li bind:this={sentinel} class="px-3 py-2 text-center text-xs text-muted-foreground">Loading more…</li>
-        {/if}
     </ul>
+    <ListPager
+        start={pageStart}
+        count={shown.length}
+        total={matches.length}
+        hasNext={pageStart + pageSize < matches.length}
+        onprev={() => (first = Math.max(0, pageStart - pageSize))}
+        onnext={() => (first = pageStart + pageSize)}
+    />
 </div>
