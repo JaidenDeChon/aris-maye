@@ -48,12 +48,12 @@
             icon: Sword,
         },
         {
-            title: 'Transmog',
+            title: '3D Dressing room',
             url: '/transmog-dressing-room',
             icon: Shirt,
         },
         {
-            title: 'My character',
+            title: 'My characters',
             url: '/my-character',
             icon: User,
         },

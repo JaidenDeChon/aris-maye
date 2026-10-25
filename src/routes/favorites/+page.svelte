@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from '$lib/components/global/page-title.svelte';
     import SeoHead from '$lib/components/global/seo-head.svelte';
     import { favoritesSeo } from '$lib/seo/static-page-seo';
     import { onMount } from 'svelte';
@@ -30,7 +31,7 @@
 <SeoHead seo={favoritesSeo} />
 
 <div>
-    <h1 class="text-3xl font-bold mb-4">Favorites</h1>
+    <PageTitle class="mb-4">Favorites</PageTitle>
 
     {#if loading}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

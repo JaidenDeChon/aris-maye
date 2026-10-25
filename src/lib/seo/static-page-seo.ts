@@ -27,9 +27,9 @@ export function buildSkillSeo(skill: SkillTreePage): PageSeo {
 }
 
 export const transmogSeo: PageSeo = {
-    title: 'OSRS Transmog Dressing Room: Try On Any Outfit in 3D',
+    title: 'OSRS 3D Dressing Room: Try On Any Outfit',
     description:
-        'The OSRS transmog dressing room: try on any wearable item in 3D, mix outfits, play emotes, then share, save or price your look on the GE.',
+        'The OSRS 3D dressing room: try on any wearable item, plan transmog outfits, play emotes, then share, save or price your look on the GE.',
     canonicalPath: '/transmog-dressing-room',
     robots: 'index',
 };
@@ -59,7 +59,7 @@ export const hiddenSeo: PageSeo = {
 };
 
 export const myCharacterSeo: PageSeo = {
-    title: 'My character · Aris Maye',
+    title: 'My characters · Aris Maye',
     description: 'Your OSRS characters, skill levels and supplies, used to filter what you can make on Aris Maye.',
     canonicalPath: '/my-character',
     robots: 'noindex',

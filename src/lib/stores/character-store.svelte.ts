@@ -8,6 +8,7 @@ import {
     type AccountType,
 } from '$lib/models/account-type';
 import { LocalStorage } from '$lib/services/persisted-store.svelte';
+import type { Outfit } from '$lib/transmog/outfit';
 
 /**
  * Ironman mode switched by hand, for the character it was switched for. Selecting a different
@@ -93,4 +94,17 @@ export function activeCanUseGrandExchange(): boolean {
 export function setIronmanMode(ironman: boolean): void {
     _store.current.ironmanModeOverride =
         ironman === accountTypeIsIronman() ? null : { characterId: activeCharacterKey(), ironman };
+}
+
+/** Saves an outfit to a character, or removes it with null. */
+export function setCharacterOutfit(characterId: CharacterProfile['id'] | string, outfit: Outfit | null): void {
+    _store.current.characters = _store.current.characters.map((c) => {
+        if (String(c.id) !== String(characterId)) return c;
+        if (!outfit) {
+            const undressed = { ...c };
+            delete undressed.outfit;
+            return undressed;
+        }
+        return { ...c, outfit: { gender: outfit.gender, equipment: { ...outfit.equipment } } };
+    });
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from '$lib/components/global/page-title.svelte';
     import {
         Star,
         StarOff,
@@ -616,7 +617,7 @@
                     <Skeleton class="h-7 w-52 mb-2" />
                     <Skeleton class="h-3 w-36" />
                 {:else if !gameItem}
-                    <h1 class="text-2xl font-bold animate-fade-in">{problemCopy.title}</h1>
+                    <PageTitle class="animate-fade-in">{problemCopy.title}</PageTitle>
                     <p class="text-muted-foreground text-sm animate-fade-in">{problemCopy.body}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-3">
                         <Button href="/items" variant="outline">Browse items</Button>
@@ -629,7 +630,7 @@
                         {/if}
                     </div>
                 {:else}
-                    <h1 class="text-2xl font-bold animate-fade-in">{gameItem.name}</h1>
+                    <PageTitle class="animate-fade-in">{gameItem.name}</PageTitle>
                     <p class="text-muted-foreground text-sm animate-fade-in">
                         {gameItem.examine}
                     </p>

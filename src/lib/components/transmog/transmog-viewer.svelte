@@ -6,9 +6,10 @@
     import { onMount } from 'svelte';
     import type { Mesh } from '$lib/osrs-model/compose';
     import { CYCLE_MS, PlayerModel, SequencePlayer } from '$lib/osrs-model/player-model';
-    import { createPalette, Rasterizer, type Camera, type Texture } from '$lib/osrs-model/rasterizer';
+    import { createPalette, Rasterizer, type Texture } from '$lib/osrs-model/rasterizer';
     import type { TransmogManifest } from '$lib/osrs-model/types';
     import { BRIGHTNESS } from '$lib/transmog/data';
+    import { playerCamera, START_YAW } from '$lib/transmog/portrait';
 
     interface Props {
         manifest: TransmogManifest;
@@ -30,8 +31,6 @@
     const SNAP_CSS_PX = 2;
     /** Beyond this, extra device pixels cost frame time without looking any different. */
     const MAX_PIXEL_RATIO = 2;
-    /** Starting turn: a little toward the controls, as the game's character designer shows you. */
-    const START_YAW = 1848;
     /** 2048ths of a turn per screen pixel dragged, and per arrow-key press. */
     const DRAG_SPEED = 3;
     const KEY_STEP = 128;
@@ -51,17 +50,6 @@
     let cycle = 0;
     let dirty = true;
     let reducedMotion = false;
-
-    const camera = (width: number, height: number): Camera => ({
-        yaw,
-        pitch: 96,
-        distance: 1000,
-        // At scale 1, fit a standing player (about 200 units tall) into roughly 80% of the height, leaving room for raised weapons.
-        zoom: Math.round(height * 3.7 * scale),
-        centerX: width >> 1,
-        centerY: Math.round(height * 0.53),
-        lift: 95,
-    });
 
     $effect(() => {
         if (!mesh) return;
@@ -168,7 +156,7 @@
         model.pose(emotePlayer ? emotePlayer.current : idlePlayer.current);
         rasterizer.cycle = reducedMotion ? 0 : cycle;
         rasterizer.clear();
-        rasterizer.draw(model, camera(rasterizer.width, rasterizer.height));
+        rasterizer.draw(model, playerCamera(rasterizer.width, rasterizer.height, yaw, scale));
         ctx.putImageData(rasterizer.image, 0, 0);
         dirty = false;
     }
