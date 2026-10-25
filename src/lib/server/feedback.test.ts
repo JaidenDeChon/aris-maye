@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { parseFeedback, renderFeedbackEmail, resendConfig, sendFeedbackEmail } from './feedback';
+import {
+    TURNSTILE_TEST_SECRET_KEY,
+    parseFeedback,
+    renderFeedbackEmail,
+    resendConfig,
+    sendFeedbackEmail,
+    turnstileSecret,
+    verifyTurnstileToken,
+} from './feedback';
 
 const valid = { kind: 'bug', summary: 'Chart is blank', details: 'On Dragon bones', email: '', page: '/items/536' };
 
@@ -53,4 +61,39 @@ test('sendFeedbackEmail posts to Resend with a reply-to when given an email', as
     const body = JSON.parse(sent!.init.body as string);
     expect(body.reply_to).toBe('p@example.com');
     expect(body.subject).toBe('[Aris Maye] Change request: Chart is blank');
+});
+
+test('turnstileSecret uses the test secret only in dev', () => {
+    expect(turnstileSecret({}, true)).toBe(TURNSTILE_TEST_SECRET_KEY);
+    expect(turnstileSecret({}, false)).toBe('');
+    expect(turnstileSecret({ TURNSTILE_SECRET_KEY: ' s ' }, false)).toBe('s');
+});
+
+describe('verifyTurnstileToken', () => {
+    test('sends the secret, token and IP to Cloudflare', async () => {
+        let sent: { url: string; init: RequestInit } | null = null;
+        const fakeFetch = (async (url: string, init: RequestInit) => {
+            sent = { url, init };
+            return new Response('{"success":true}', { status: 200 });
+        }) as unknown as typeof fetch;
+
+        expect(await verifyTurnstileToken('s', 't', '1.2.3.4', fakeFetch)).toEqual({ ok: true });
+        expect(sent!.url).toBe('https://challenges.cloudflare.com/turnstile/v0/siteverify');
+        const form = sent!.init.body as URLSearchParams;
+        expect([form.get('secret'), form.get('response'), form.get('remoteip')]).toEqual(['s', 't', '1.2.3.4']);
+    });
+
+    test('fails with Cloudflare’s error codes, and when Cloudflare can’t be reached', async () => {
+        const rejected = (async () =>
+            new Response('{"success":false,"error-codes":["timeout-or-duplicate"]}')) as unknown as typeof fetch;
+        expect(await verifyTurnstileToken('s', 't', '', rejected)).toEqual({
+            ok: false,
+            errorCodes: ['timeout-or-duplicate'],
+        });
+
+        const offline = (async () => {
+            throw new Error('offline');
+        }) as unknown as typeof fetch;
+        expect(await verifyTurnstileToken('s', 't', '', offline)).toEqual({ ok: false, errorCodes: [] });
+    });
 });

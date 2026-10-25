@@ -1,7 +1,9 @@
 <script lang="ts">
     import { MessageSquareText } from 'lucide-svelte';
     import { toast } from 'svelte-sonner';
+    import { dev } from '$app/environment';
     import { page } from '$app/state';
+    import { env } from '$env/dynamic/public';
     import * as Dialog from '$lib/components/ui/dialog';
     import * as Tooltip from '$lib/components/ui/tooltip';
     import * as ToggleGroup from '$lib/components/ui/toggle-group';
@@ -9,6 +11,7 @@
     import { Input } from '$lib/components/ui/input';
     import { Label } from '$lib/components/ui/label';
     import { FEEDBACK_LIMITS, type FeedbackKind } from '$lib/constants/feedback';
+    import TurnstileWidget from './turnstile-widget.svelte';
 
     /**
      * A "Send feedback" button for the bottom of the sidenav. It opens a short form for reporting a
@@ -29,6 +32,10 @@
         change: 'What would you like to see, and what would it help you do?',
     };
 
+    // Cloudflare's always-pass test key in dev, like jaiden.dev. Without a key in production the
+    // widget is left out, and the server answers that feedback isn't set up.
+    const turnstileSiteKey = env.PUBLIC_TURNSTILE_SITE_KEY || (dev ? '1x00000000000000000000AA' : '');
+
     let open = $state(false);
     let kind = $state<FeedbackKind>('bug');
     let summary = $state('');
@@ -37,6 +44,8 @@
     let honeypot = $state('');
     let submitting = $state(false);
     let errorMessage = $state('');
+    let turnstileToken = $state('');
+    let turnstile = $state<TurnstileWidget>();
 
     // Clear the form once the dialog has closed, so the next one starts blank.
     $effect(() => {
@@ -47,12 +56,17 @@
         email = '';
         honeypot = '';
         errorMessage = '';
+        turnstileToken = '';
     });
 
     async function submit(event: SubmitEvent) {
         event.preventDefault();
         if (submitting) return;
         errorMessage = '';
+        if (turnstileSiteKey && !turnstileToken) {
+            errorMessage = 'Please wait for the verification check to finish, then send again.';
+            return;
+        }
         submitting = true;
 
         try {
@@ -66,6 +80,7 @@
                     email,
                     page: page.url.pathname + page.url.search,
                     _honeypot: honeypot,
+                    token: turnstileToken,
                 }),
             });
             const data = (await response.json().catch(() => null)) as { success?: boolean; message?: string } | null;
@@ -80,6 +95,8 @@
                 error instanceof Error && error.message
                     ? error.message
                     : 'Your feedback could not be sent right now. Please try again.';
+            // The server has used up this token, so the next try needs a new one.
+            turnstile?.reset();
         } finally {
             submitting = false;
         }
@@ -173,6 +190,10 @@
                 Company
                 <input bind:value={honeypot} name="company" autocomplete="off" tabindex="-1" type="text" />
             </label>
+
+            {#if turnstileSiteKey}
+                <TurnstileWidget bind:this={turnstile} bind:token={turnstileToken} siteKey={turnstileSiteKey} />
+            {/if}
 
             <p class="text-xs text-muted-foreground">The page you're on is sent along with your feedback.</p>
 

@@ -157,3 +157,34 @@ export async function sendFeedbackEmail(
     const data = (await response.json().catch(() => null)) as { message?: string } | null;
     return { ok: false, message: data?.message || 'Unable to send your feedback right now.' };
 }
+
+/** Cloudflare's test secret that passes every token, so the dialog works in dev without real keys. */
+export const TURNSTILE_TEST_SECRET_KEY = '1x0000000000000000000000000000000AA';
+
+/**
+ * The Turnstile secret from `TURNSTILE_SECRET_KEY`, or Cloudflare's always-pass test secret in dev.
+ * Empty in production until it's set, which keeps the endpoint off rather than unprotected.
+ */
+export function turnstileSecret(env: Record<string, string | undefined>, isDev: boolean): string {
+    return text(env.TURNSTILE_SECRET_KEY) || (isDev ? TURNSTILE_TEST_SECRET_KEY : '');
+}
+
+/** Checks the dialog's Turnstile token with Cloudflare. Each token passes once. */
+export async function verifyTurnstileToken(
+    secret: string,
+    token: string,
+    remoteIp = '',
+    fetchFn: typeof fetch = fetch,
+): Promise<{ ok: true } | { ok: false; errorCodes: string[] }> {
+    const form = new URLSearchParams({ secret, response: token });
+    if (remoteIp) form.set('remoteip', remoteIp);
+
+    const response = await fetchFn('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        body: form,
+    }).catch(() => null);
+    const data = (await response?.json().catch(() => null)) as { success?: boolean; 'error-codes'?: string[] } | null;
+
+    if (data?.success) return { ok: true };
+    return { ok: false, errorCodes: Array.isArray(data?.['error-codes']) ? data['error-codes'] : [] };
+}
