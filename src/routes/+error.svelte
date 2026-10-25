@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from '$lib/components/global/page-title.svelte';
     import { page } from '$app/state';
     import { resolve } from '$app/paths';
     import SeoHead from '$lib/components/global/seo-head.svelte';
@@ -17,7 +18,7 @@
 <SeoHead {seo} />
 
 <div class="content-sizing py-16 text-center">
-    <h1 class="text-3xl font-bold mb-2">{page.status}</h1>
+    <PageTitle class="mb-2">{page.status}</PageTitle>
     <p class="text-muted-foreground mb-6">
         {page.status === 404 ? "We couldn't find that page." : (page.error?.message ?? 'Something went wrong.')}
     </p>

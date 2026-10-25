@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from '$lib/components/global/page-title.svelte';
     import ItemCard from '$lib/components/global/item-card.svelte';
     import * as Pagination from '$lib/components/ui/pagination';
     import * as Select from '$lib/components/ui/select';
@@ -563,7 +564,7 @@
             {#if skill}
                 <img src={skill.icon} alt={`${headingLabel} icon`} class="h-8 w-8" />
             {/if}
-            <h1 class="text-3xl font-bold">{headingLabel}</h1>
+            <PageTitle>{headingLabel}</PageTitle>
             {#if xpGuide}
                 <div class="flex flex-wrap gap-x-4 gap-y-1 sm:ml-auto">
                     <a

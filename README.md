@@ -11,8 +11,8 @@ SvelteKit application for Old School RuneScape skilling and Grand Exchange brows
     - Item data derived from
         - [OSRSDeboxed-DB](https://github.com/0xNeffarion/osrsreboxed-db)
         - [OSRS Wiki](https://oldschool.runescape.wiki)
-    - 3D models, textures and animations for the Transmog Dressing Room from the live game cache, via the [OpenRS2 Archive](https://archive.openrs2.org)
-    - Colour matches in the Transmog Dressing Room from [scape.fashion](https://scape.fashion)'s API
+    - 3D models, textures and animations for the 3D Dressing Room from the live game cache, via the [OpenRS2 Archive](https://archive.openrs2.org)
+    - Colour matches in the 3D Dressing Room from [scape.fashion](https://scape.fashion)'s API
 
 ## Key feature areas
 

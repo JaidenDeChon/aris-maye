@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SkillNames } from '$lib/constants/enums/skill-names';
 import { defaultSkillLevels } from '$lib/constants/default-skill-levels';
 import { DEFAULT_ACCOUNT_TYPE, normalizeAccountType, type AccountType } from '$lib/models/account-type';
+import type { Outfit } from '$lib/transmog/outfit';
 import type { UUID } from 'crypto';
 
 /**
@@ -10,12 +11,14 @@ import type { UUID } from 'crypto';
  * @property name         - The name of the character.
  * @property accountType  - Which game mode the character plays, which decides how prices are shown.
  * @property skillLevels  - Record relating skill levels to their respective level numbers.
+ * @property outfit       - What the character wears, saved from the 3D dressing room. Absent until one is saved.
  */
 export interface ICharacterProfile {
     id: UUID;
     name: string;
     accountType: AccountType;
     skillLevels: Record<SkillNames, number>;
+    outfit?: Outfit;
 }
 
 export class CharacterProfile implements ICharacterProfile {
@@ -23,6 +26,7 @@ export class CharacterProfile implements ICharacterProfile {
     name: ICharacterProfile['name'];
     accountType: ICharacterProfile['accountType'];
     skillLevels: ICharacterProfile['skillLevels'];
+    outfit?: ICharacterProfile['outfit'];
 
     constructor(
         name: ICharacterProfile['name'],

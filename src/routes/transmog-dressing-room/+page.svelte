@@ -130,8 +130,13 @@
     const structuredData = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
-        name: 'OSRS Transmog Dressing Room',
-        alternateName: ['OSRS transmog', 'OSRS dressing room', 'OSRS fashionscape planner'],
+        name: 'OSRS 3D Dressing Room',
+        alternateName: [
+            'OSRS transmog',
+            'OSRS transmog dressing room',
+            'OSRS dressing room',
+            'OSRS fashionscape planner',
+        ],
         description: transmogSeo.description,
         url: canonicalUrl(transmogSeo.canonicalPath),
         applicationCategory: 'GameApplication',
@@ -201,7 +206,7 @@
 </svelte:head>
 
 <div class="content-sizing flex flex-col gap-6 pt-6 pb-10">
-    <GuideHeader title="Transmog Dressing Room" answer="Try on anything in OSRS" />
+    <GuideHeader title="OSRS 3D Dressing Room" answer="Try on anything in OSRS" />
 
     {#if loadError}
         <div class="rounded-md border bg-muted/20 p-6 text-sm text-muted-foreground">
@@ -459,6 +464,7 @@
             <OutfitCost {outfit} items={transmog.items} />
             <SavedOutfits
                 {outfit}
+                characterId={data.characterId}
                 items={transmog.items}
                 onload={(saved) => transmog && (outfit = validateOutfit(saved, transmog.items))}
             />
@@ -471,9 +477,8 @@
     >
         <h2 id="about-dressing-room" class="font-semibold text-foreground">About the dressing room</h2>
         <p>
-            This OSRS transmog dressing room lets you try on any wearable item in the game. Mix pieces from every slot
-            to plan your outfit and check GE prices for your selections. Weapons are held in the standard stance for
-            now.
+            This OSRS 3D dressing room lets you try on any wearable item in the game. Mix pieces from every slot to plan
+            your outfit and check GE prices for your selections. Weapons are held in the standard stance for now.
         </p>
     </section>
 

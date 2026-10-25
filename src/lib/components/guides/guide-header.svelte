@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from '$lib/components/global/page-title.svelte';
     import UpdatedTime from './updated-time.svelte';
 
     /** The top of a guide: what it is, the one-line answer, and how fresh the numbers are. */
@@ -22,7 +23,7 @@
 </script>
 
 <header class="flex flex-col gap-2">
-    <h1 class="rs-font-with-shadow dark:rs-font text-3xl text-primary text-balance md:text-4xl">{title}</h1>
+    <PageTitle>{title}</PageTitle>
     {#if answer}
         <p class="max-w-prose text-base text-muted-foreground">{answer}</p>
     {/if}
