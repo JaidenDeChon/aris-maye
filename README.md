@@ -33,6 +33,15 @@ bun run dev
 
 The first `dev` or `build` downloads the game cache (about 190MB) to build the transmog data, which takes a minute. Set `TRANSMOG_DATA=skip` to leave it out, or run `bun run extract-transmog` to refresh it on its own.
 
+## Feedback emails
+
+The sidenav's **Send feedback** dialog posts bug reports and change requests to `/api/feedback`, which emails them through [Resend](https://resend.com), the same provider as the contact form on jaiden.dev. Until all of these but `FEEDBACK_FROM_EMAIL` are set, the endpoint answers 503 and the dialog says feedback isn't set up yet:
+
+- `RESEND_API_KEY`: a Resend API key.
+- `FEEDBACK_EMAIL`: where feedback is sent.
+- `FEEDBACK_FROM_EMAIL` (optional): the sender, on a domain verified in Resend. Defaults to Resend's test sender, `onboarding@resend.dev`, which only delivers to the Resend account's own address.
+- `PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`: a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) widget's keys. The dialog shows the check and the endpoint verifies its token before sending, so scripts can't post feedback directly. In dev both fall back to Cloudflare's always-pass test keys.
+
 ## Tooling
 
 - Tailwind CSS utilities via `tailwind.config.ts`.
