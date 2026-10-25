@@ -192,7 +192,12 @@
             </label>
 
             {#if turnstileSiteKey}
-                <TurnstileWidget bind:this={turnstile} bind:token={turnstileToken} siteKey={turnstileSiteKey} />
+                <div class="flex flex-col gap-1">
+                    <TurnstileWidget bind:this={turnstile} bind:token={turnstileToken} siteKey={turnstileSiteKey} />
+                    <p class="text-xs text-muted-foreground">
+                        Cloudflare verification is known to fail when using some VPNs.
+                    </p>
+                </div>
             {/if}
 
             <p class="text-xs text-muted-foreground">The page you're on is sent along with your feedback.</p>
